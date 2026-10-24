@@ -36,6 +36,23 @@
                 }
             ]);
 
+            const [loans, setLoans] = useState([
+                { id: '1', item: 'Stiksav', borrower: 'Henrik Nabo', date: '2026-05-10' }
+            ]);
+
+            const [shoppingList, setShoppingList] = useState([
+                { id: '1', item: 'Gaffatape (sidste rulle brugt)' }
+            ]);
+
+            const [isPro, setIsPro] = useState(false);
+            const [discountCode, setDiscountCode] = useState('');
+            const [codeMessage, setCodeMessage] = useState('');
+
+            // AI Scan states
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
+            const [capturedImage, setCapturedImage] = useState(null);
+
             const updateItemQuantity = (boxId, itemIdx, delta) => {
                 setBoxes(prevBoxes =>
                     prevBoxes.map(box => {
@@ -47,6 +64,46 @@
                         return { ...box, items: updatedItems };
                     })
                 );
+            };
+
+            const simulateAiScan = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCapturedImage(reader.result);
+                    setIsAnalyzing(true);
+                    
+                    setTimeout(() => {
+                        setIsAnalyzing(false);
+                        setAiAnalysisResult({
+                            title: 'Ny Kasse - Registreret via AI',
+                            location: 'Værksted - Hovedreol',
+                            items: [
+                                { name: 'Gaffatape Ruller', quantity: 4, category: 'Forbrug', hint: 'Ligger i venstre side' },
+                                { name: 'Bajonetsavklinger', quantity: 3, category: 'Tilbehør', hint: 'I aflang æske' }
+                            ]
+                        });
+                    }, 2000);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const saveAiBox = () => {
+                if (!aiAnalysisResult) return;
+                const newBox = {
+                    id: 'box-' + Date.now(),
+                    title: aiAnalysisResult.title,
+                    location: aiAnalysisResult.location,
+                    image: capturedImage || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                    items: aiAnalysisResult.items
+                };
+                setBoxes([newBox, ...boxes]);
+                alert('Kasse gemt med succes!');
+                setAiAnalysisResult(null);
+                setCapturedImage(null);
+                setActiveTab('search');
             };
 
             const filteredBoxes = boxes.filter(box => {
@@ -67,80 +124,173 @@
                                 <p className="text-xs text-slate-400">{user.email}</p>
                             </div>
                         </div>
-                        <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">
-                            ★ PRO
-                        </span>
+                        {isPro ? (
+                            <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">
+                                ★ PRO
+                            </span>
+                        ) : (
+                            <button onClick={() => setActiveTab('pro')} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium shadow transition">
+                                Abonner PRO
+                            </button>
+                        )}
                     </header>
 
                     <main className="flex-1 p-4 overflow-y-auto">
-                        <div className="space-y-4">
-                            <input 
-                                type="text" 
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Søg efter ting eller kasser..." 
-                                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-amber-500"
-                            />
-
+                        {activeTab === 'search' && (
                             <div className="space-y-4">
-                                {filteredBoxes.map((box) => (
-                                    <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-lg">
-                                        <div className="relative h-44 bg-slate-700">
-                                            <img src={box.image} alt={box.title} className="w-full h-full object-cover" />
-                                            <div className="absolute top-2 right-2 bg-slate-900/80 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-400 border border-slate-700">
-                                                📍 {box.location}
+                                <input 
+                                    type="text" 
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Søg efter ting eller kasser..." 
+                                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-amber-500"
+                                />
+
+                                <div className="space-y-4">
+                                    {filteredBoxes.map((box) => (
+                                        <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-lg">
+                                            <div className="relative h-44 bg-slate-700">
+                                                <img src={box.image} alt={box.title} className="w-full h-full object-cover" />
+                                                <div className="absolute top-2 right-2 bg-slate-900/80 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-400 border border-slate-700">
+                                                    📍 {box.location}
+                                                </div>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                <h3 className="font-bold text-base text-slate-100">{box.title}</h3>
+                                                <div className="space-y-2">
+                                                    {box.items.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-semibold text-amber-300">{item.name}</span>
+                                                                    <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold">
+                                                                        {item.quantity} stk.
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-400">💡 {item.hint}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, -1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-slate-200 font-bold text-xs"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <span className="w-6 text-center text-xs font-bold text-white">{item.quantity}</span>
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, 1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-slate-200 font-bold text-xs"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="p-4 space-y-3">
-                                            <h3 className="font-bold text-base text-slate-100">{box.title}</h3>
-                                            <div className="space-y-2">
-                                                {box.items.map((item, idx) => (
-                                                    <div key={idx} className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-semibold text-amber-300">{item.name}</span>
-                                                                <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold">
-                                                                    {item.quantity} stk.
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-400">💡 {item.hint}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
-                                                            <button 
-                                                                onClick={() => updateItemQuantity(box.id, idx, -1)}
-                                                                className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-slate-200 font-bold text-xs"
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="w-6 text-center text-xs font-bold text-white">{item.quantity}</span>
-                                                            <button 
-                                                                onClick={() => updateItemQuantity(box.id, idx, 1)}
-                                                                className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-slate-200 font-bold text-xs"
-                                                            >
-                                                                +
-                                                              </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'scan' && (
+                            <div className="space-y-6 text-center py-4">
+                                {!isAnalyzing && !aiAnalysisResult && (
+                                    <div className="bg-slate-800 border-2 border-dashed border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center space-y-4">
+                                        <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400 text-3xl">
+                                            📸
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-white">AI Billedscanner & Tæller</h3>
+                                            <p className="text-sm text-slate-400 mt-1">Tag et billede af kassen. AI'en registrerer indhold og tæller antal.</p>
+                                        </div>
+                                        <label className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 px-6 rounded-xl shadow-lg transition cursor-pointer inline-block">
+                                            <span>Tag billede / Upload kasse</span>
+                                            <input type="file" accept="image/*" capture="environment" onChange={simulateAiScan} className="hidden" />
+                                        </label>
+                                    </div>
+                                )}
+
+                                {isAnalyzing && (
+                                    <div className="bg-slate-800 border border-slate-700 rounded-3xl p-10 space-y-5 text-center">
+                                        <div className="w-14 h-14 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                        <p className="text-sm font-medium text-white">AI analyserer indhold og tæller enheder...</p>
+                                    </div>
+                                )}
+
+                                {aiAnalysisResult && (
+                                    <div className="bg-slate-800 border border-amber-500/40 rounded-3xl p-5 space-y-4 text-left shadow-2xl">
+                                        <h3 className="font-bold text-sm text-amber-400">✨ AI Analyse Gennemført</h3>
+                                        {capturedImage && <img src={capturedImage} alt="Kasse" className="w-full h-36 object-cover rounded-xl border border-slate-700" />}
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400">Kassenavn</label>
+                                            <input 
+                                                type="text" 
+                                                value={aiAnalysisResult.title}
+                                                onChange={(e) => setAiAnalysisResult({...aiAnalysisResult, title: e.target.value})}
+                                                className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            {aiAnalysisResult.items.map((item, i) => (
+                                                <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                    <span className="font-bold text-amber-300">{item.name}</span>
+                                                    <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded font-bold">{item.quantity} stk.</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={() => setAiAnalysisResult(null)} className="flex-1 bg-slate-700 py-3 rounded-xl text-xs font-bold">Annuller</button>
+                                            <button onClick={saveAiBox} className="flex-1 bg-amber-500 text-slate-900 py-3 rounded-xl text-xs font-bold">Gem Kasse ✓</button>
                                         </div>
                                     </div>
-                                ))}
+                                )}
                             </div>
-                        </div>
+                        )}
+
+                        {activeTab === 'loans' && (
+                            <div className="space-y-4">
+                                <h2 className="text-lg font-bold">Udlån & Indkøbsliste</h2>
+                                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-3">
+                                    <h3 className="font-semibold text-sm text-amber-400">Udlånte ting</h3>
+                                    {loans.map(loan => (
+                                        <div key={loan.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800 text-sm">
+                                            <div>
+                                                <span className="font-medium">{loan.item}</span>
+                                                <p className="text-xs text-slate-400">Lånt af: {loan.borrower}</p>
+                                            </div>
+                                            <button onClick={() => setLoans(loans.filter(l => l.id !== loan.id))} className="text-xs bg-emerald-600/20 text-emerald-400 px-2.5 py-1 rounded">Afleveret ✓</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'pro' && (
+                            <div className="space-y-6 py-2">
+                                <div className="bg-gradient-to-br from-amber-500/20 to-slate-800 border border-amber-500/40 rounded-3xl p-6 text-center space-y-3">
+                                    <h2 className="text-xl font-extrabold text-white">FindIt PRO</h2>
+                                    <p className="text-sm text-slate-300">Få ubegrænsede kasser og AI-mængdestyring for 29 kr./md.</p>
+                                    <button onClick={() => { setIsPro(true); alert('PRO aktiveret!'); setActiveTab('search'); }} className="w-full bg-amber-500 text-slate-900 font-bold py-3.5 rounded-xl">
+                                        Aktiver PRO (Simuleret MobilePay)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </main>
 
                     <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-800 border-t border-slate-700 flex justify-around p-3 z-20">
-                        <button className="flex flex-col items-center gap-1 text-xs text-amber-400 font-bold">
+                        <button onClick={() => setActiveTab('search')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'search' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">🔎</span> Søgning
                         </button>
-                        <button className="flex flex-col items-center gap-1 text-xs text-slate-400">
+                        <button onClick={() => setActiveTab('scan')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'scan' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">📸</span> AI Skan
                         </button>
-                        <button className="flex flex-col items-center gap-1 text-xs text-slate-400">
+                        <button onClick={() => setActiveTab('loans')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'loans' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">📋</span> Udlån
                         </button>
-                        <button className="flex flex-col items-center gap-1 text-xs text-slate-400">
+                        <button onClick={() => setActiveTab('pro')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'pro' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">★</span> PRO
                         </button>
                     </nav>
