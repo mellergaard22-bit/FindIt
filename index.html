@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FindIt</title>
+    <title>FindIt - Værkøjs- og Kassestyring</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -26,11 +26,19 @@
             const [password, setPassword] = useState('');
             const [authError, setAuthError] = useState('');
 
+            // Enhedsstyring / Device Limit State (Maks 3 enheder pr. bruger)
+            const [showDeviceLimitModal, setShowDeviceLimitModal] = useState(false);
+            const [activeDevices, setActiveDevices] = useState([
+                { id: 'dev-1', name: 'iPhone 15 Pro (Denne enhed)', lastActive: 'Lige nu' },
+                { id: 'dev-2', name: 'iPad Værksted', lastActive: 'I går' },
+                { id: 'dev-3', name: 'Samsung Galaxy S22', lastActive: 'For 3 dage siden' }
+            ]);
+
             // App State
             const [activeTab, setActiveTab] = useState('search');
             const [searchQuery, setSearchQuery] = useState('');
             
-            // Persistent Boxes in localStorage
+            // Persistent Boxes in localStorage (med mængdestyring / stk-tal)
             const [boxes, setBoxes] = useState(() => {
                 const saved = localStorage.getItem('findit_boxes');
                 if (saved) return JSON.parse(saved);
@@ -41,8 +49,8 @@
                         location: 'Værksted - Reol B',
                         image: 'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=600&q=80',
                         items: [
-                            { name: 'Gaffatape', synonyms: ['sølvtape', 'duct tape', 'tape'], category: 'Forbrug', hint: 'Øverst i højre hjørne' },
-                            { name: 'Stikdåse 3-vejs', synonyms: ['forlængerled', 'strømskinne'], category: 'El', hint: 'Midt i kassen' }
+                            { name: 'Gaffatape', quantity: 4, synonyms: ['sølvtape', 'duct tape', 'tape'], category: 'Forbrug', hint: 'Øverst i højre hjørne' },
+                            { name: 'Stikdåse 3-vejs', quantity: 2, synonyms: ['forlængerled', 'strømskinne'], category: 'El', hint: 'Midt i kassen' }
                         ]
                     }
                 ];
@@ -63,6 +71,11 @@
             const [discountCode, setDiscountCode] = useState('');
             const [codeMessage, setCodeMessage] = useState('');
 
+            // AI Scan & Analysis state
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
+            const [capturedImage, setCapturedImage] = useState(null);
+
             // Admin state & metrics
             const [logoClicks, setLogoClicks] = useState(0);
             const [showAdminModal, setShowAdminModal] = useState(false);
@@ -71,7 +84,6 @@
             const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
             const [newCustomCode, setNewCustomCode] = useState('');
             
-            // Simulated user registry for admin stats
             const [allUsers, setAllUsers] = useState([
                 { email: 'martin_meller@hotmail.com', role: 'Admin / PRO', joined: '2026-10-01' },
                 { email: 'testbruger@vaerksted.dk', role: 'Gratis (3 kasser)', joined: '2026-10-22' },
@@ -85,8 +97,7 @@
             useEffect(() => {
                 const savedUser = localStorage.getItem('findit_user');
                 if (savedUser) {
-                    const parsed = JSON.parse(savedUser);
-                    setUser(parsed);
+                    setUser(JSON.parse(savedUser));
                 }
             }, []);
 
@@ -106,10 +117,22 @@
                     setAuthError('Udfyld venligst alle felter');
                     return;
                 }
-                const newUser = { email, uid: 'user_' + Date.now() };
+
+                // Simulerer tjek af enhedsgrænse ved login (maks 3 enheder)
+                if (activeDevices.length >= 3) {
+                    setShowDeviceLimitModal(true);
+                    return;
+                }
+
+                completeLogin(email);
+            };
+
+            const completeLogin = (userEmail) => {
+                const newUser = { email: userEmail, uid: 'user_' + Date.now() };
                 setUser(newUser);
                 localStorage.setItem('findit_user', JSON.stringify(newUser));
                 setAuthError('');
+                setShowDeviceLimitModal(false);
             };
 
             const handleLogout = () => {
@@ -165,6 +188,60 @@
                 }, 2500);
             };
 
+            // Ændre antal (stk) for en genstand i en kasse
+            const updateItemQuantity = (boxId, itemIdx, delta) => {
+                setBoxes(boxes.map(box => {
+                    if (box.id !== boxId) return box;
+                    const updatedItems = [...box.items];
+                    const currentQty = updatedItems[itemIdx].quantity || 1;
+                    const newQty = Math.max(0, currentQty + delta);
+                    updatedItems[itemIdx] = { ...updatedItems[itemIdx], quantity: newQty };
+                    return { ...box, items: updatedItems };
+                }));
+            };
+
+            // Simuleret ægte AI-billedanalyse af kassen
+            const simulateAiScan = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCapturedImage(reader.result);
+                    setIsAnalyzing(true);
+                    
+                    setTimeout(() => {
+                        setIsAnalyzing(false);
+                        setAiAnalysisResult({
+                            title: 'Kasse - Registreret via AI',
+                            location: 'Værksted - Hovedreol',
+                            items: [
+                                { name: 'Gaffatape Ruller', quantity: 4, category: 'Forbrug', hint: 'Ligger i venstre side' },
+                                { name: 'Bajonetsavklinger (Metal)', quantity: 3, category: 'Tilbehør', hint: 'I aflang æske' },
+                                { name: 'Kabelsko 2.5mm', quantity: 25, category: 'El', hint: 'I lille sorteringsboks' }
+                            ]
+                        });
+                    }, 2500);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const saveAiBox = () => {
+                if (!aiAnalysisResult) return;
+                const newBox = {
+                    id: 'box-' + Date.now(),
+                    title: aiAnalysisResult.title,
+                    location: aiAnalysisResult.location,
+                    image: capturedImage || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                    items: aiAnalysisResult.items
+                };
+                setBoxes([newBox, ...boxes]);
+                alert('Kasse og AI-analyseret indhold gemt!');
+                setAiAnalysisResult(null);
+                setCapturedImage(null);
+                setActiveTab('search');
+            };
+
             const filteredBoxes = boxes.filter(box => {
                 if (!searchQuery) return true;
                 const q = searchQuery.toLowerCase();
@@ -172,14 +249,14 @@
                 const matchItem = box.items.some(i => 
                     i.name.toLowerCase().includes(q) || 
                     i.category.toLowerCase().includes(q) ||
-                    i.synonyms.some(s => s.toLowerCase().includes(q))
+                    (i.synonyms && i.synonyms.some(s => s.toLowerCase().includes(q)))
                 );
                 return matchTitle || matchItem;
             });
 
             if (!user) {
                 return (
-                    <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center p-6 shadow-2xl">
+                    <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center p-6 shadow-2xl relative">
                         <div className="text-center space-y-3 mb-8">
                             <div className="w-16 h-16 bg-amber-500 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
                                 🔍
@@ -233,6 +310,51 @@
                                 </button>
                             </div>
                         </div>
+
+                        {/* Enhedsgrænse Modal ved login */}
+                        {showDeviceLimitModal && (
+                            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="bg-slate-800 border border-red-500/50 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl text-center">
+                                    <div className="w-14 h-14 bg-red-500/20 text-red-400 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold border border-red-500/30">
+                                        ⚠️
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="font-bold text-lg text-white">Enhedsgrænse nået</h3>
+                                        <p className="text-xs text-slate-400">
+                                            Din konto har allerede maks antal tilladte enheder tilknyttet (3/3). For at logge på her, skal du fjerne en eksisterende enhed.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2 text-left pt-1">
+                                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Aktive enheder:</span>
+                                        {activeDevices.map(dev => (
+                                            <div key={dev.id} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                <div>
+                                                    <span className="font-medium text-slate-200">{dev.name}</span>
+                                                    <p className="text-[10px] text-slate-500">Sidst aktiv: {dev.lastActive}</p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => {
+                                                        setActiveDevices(activeDevices.filter(d => d.id !== dev.id));
+                                                        completeLogin(email);
+                                                    }}
+                                                    className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-2.5 py-1 rounded text-[10px] font-bold transition"
+                                                >
+                                                    Fjern enhed
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setShowDeviceLimitModal(false)}
+                                        className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-2.5 rounded-xl text-xs transition mt-2"
+                                    >
+                                        Annuller
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
@@ -289,7 +411,7 @@
                                 </div>
 
                                 <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
-                                    {['Gaffatape', 'Karburator', 'Stikdåse', 'Pløkker'].map((tag) => (
+                                    {['Gaffatape', 'Karburator', 'Stikdåse', 'Kabelsko'].map((tag) => (
                                         <button 
                                             key={tag} 
                                             onClick={() => setSearchQuery(tag)}
@@ -302,7 +424,7 @@
 
                                 <div className="flex justify-between items-center text-xs text-slate-400 pt-2">
                                     <span>Viser {filteredBoxes.length} kasser</span>
-                                    <span>{boxes.reduce((acc, b) => acc + b.items.length, 0)} ting total</span>
+                                    <span>{boxes.reduce((acc, b) => acc + b.items.reduce((sum, i) => sum + (i.quantity || 1), 0), 0)} genstande total</span>
                                 </div>
 
                                 <div className="space-y-4">
@@ -316,16 +438,37 @@
                                             </div>
                                             <div className="p-4 space-y-3">
                                                 <h3 className="font-bold text-base text-slate-100">{box.title}</h3>
-                                                <div className="space-y-1.5">
+                                                <div className="space-y-2">
                                                     {box.items.map((item, idx) => (
-                                                        <div key={idx} className="bg-slate-900/60 p-2 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
-                                                            <div>
-                                                                <span className="font-semibold text-amber-300">{item.name}</span>
+                                                        <div key={idx} className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
+                                                            <div className="space-y-0.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-semibold text-amber-300">{item.name}</span>
+                                                                    <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold border border-amber-500/20">
+                                                                        {item.quantity || 1} stk.
+                                                                    </span>
+                                                                </div>
                                                                 <p className="text-xs text-slate-400">💡 {item.hint}</p>
                                                             </div>
-                                                            <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                                                                {item.category}
-                                                            </span>
+                                                            
+                                                            {/* Mængdestyring: plus og minus knapper */}
+                                                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, -1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
+                                                                    title="Fjern 1 stk"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <span className="w-6 text-center text-xs font-bold text-white">{item.quantity || 1}</span>
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, 1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
+                                                                    title="Tilføj 1 stk"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -337,47 +480,83 @@
                         )}
 
                         {activeTab === 'scan' && (
-                            <div className="space-y-6 text-center py-6">
-                                <div className="bg-slate-800 border-2 border-dashed border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center space-y-4">
-                                    <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400 text-3xl">
-                                        📷
+                            <div className="space-y-6 text-center py-4">
+                                {!isAnalyzing && !aiAnalysisResult && (
+                                    <div className="bg-slate-800 border-2 border-dashed border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center space-y-4">
+                                        <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400 text-3xl">
+                                            📸
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-white">AI Billedscanner & Tæller</h3>
+                                            <p className="text-sm text-slate-400 mt-1">Tag et billede af kassen. AI'en registrerer indhold og tæller antallet af f.eks. ruller.</p>
+                                        </div>
+                                        
+                                        {!isPro && boxes.length >= 3 && (
+                                            <p className="text-xs text-red-400 font-medium bg-red-950/40 p-2.5 rounded-xl border border-red-900/50 w-full">
+                                                Du har nået grænsen på 3 kasser i gratisversionen. <button onClick={() => setShowMobilePayModal(true)} className="underline text-amber-400">Abonner på PRO</button>
+                                            </p>
+                                        )}
+
+                                        <label className={`w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 px-6 rounded-xl shadow-lg transition cursor-pointer inline-block ${!isPro && boxes.length >= 3 ? 'opacity-50 pointer-events-none' : ''}`}>
+                                            <span>Tag billede / Upload kasse</span>
+                                            <input type="file" accept="image/*" capture="environment" onChange={simulateAiScan} className="hidden" />
+                                        </label>
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">Skan ny kasse eller skuffe</h3>
-                                        <p className="text-sm text-slate-400 mt-1">Tag et billede, så gemmes det fast på din konto.</p>
+                                )}
+
+                                {isAnalyzing && (
+                                    <div className="bg-slate-800 border border-slate-700 rounded-3xl p-10 space-y-5 text-center">
+                                        <div className="w-14 h-14 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                        <div className="space-y-1">
+                                            <h3 className="font-bold text-base text-white">Gemmer & Analyserer billede...</h3>
+                                            <p className="text-xs text-slate-400">AI tæller genstande og identificerer indhold.</p>
+                                        </div>
                                     </div>
-                                    <button 
-                                        onClick={() => {
-                                            if (!isPro && boxes.length >= 3) {
-                                                setShowMobilePayModal(true);
-                                                return;
-                                            }
-                                            const title = prompt("Indtast kassenavn:", "Kasse " + (boxes.length + 1) + " - Diverse");
-                                            if (title) {
-                                                const newBox = {
-                                                    id: 'box-' + Date.now(),
-                                                    title: title,
-                                                    location: 'Værksted',
-                                                    image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
-                                                    items: [
-                                                        { name: 'Skruemaskine', synonyms: ['boremaskine'], category: 'El-værktøj', hint: 'Ligger øverst' },
-                                                        { name: 'Bits-sæt', synonyms: ['torx'], category: 'Tilbehør', hint: 'I side-lomme' }
-                                                    ]
-                                                };
-                                                setBoxes([newBox, ...boxes]);
-                                                alert('Kasse gemt fast!');
-                                                setActiveTab('search');
-                                            }
-                                        }}
-                                        className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 px-6 rounded-xl shadow-lg transition"
-                                    >
-                                        + Tag Billede / Skan Kasse
-                                    </button>
-                                </div>
-                                {!isPro && (
-                                    <p className="text-xs text-slate-400">
-                                        Du bruger gratis-versionen ({boxes.length}/3 kasser oprettet). <button onClick={() => setShowMobilePayModal(true)} className="text-amber-400 underline">Abonner på PRO her</button>
-                                    </p>
+                                )}
+
+                                {aiAnalysisResult && (
+                                    <div className="bg-slate-800 border border-amber-500/40 rounded-3xl p-5 space-y-4 text-left shadow-2xl">
+                                        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+                                            <h3 className="font-bold text-sm text-amber-400">✨ AI Analyse Gennemført</h3>
+                                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Klar til lagring</span>
+                                        </div>
+                                        {capturedImage && (
+                                            <img src={capturedImage} alt="Scanned box" className="w-full h-36 object-cover rounded-xl border border-slate-700" />
+                                        )}
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400">Kassenavn</label>
+                                            <input 
+                                                type="text" 
+                                                value={aiAnalysisResult.title}
+                                                onChange={(e) => setAiAnalysisResult({...aiAnalysisResult, title: e.target.value})}
+                                                className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400">Registreret indhold & antal:</label>
+                                            <div className="space-y-1.5">
+                                                {aiAnalysisResult.items.map((item, i) => (
+                                                    <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                        <div>
+                                                            <span className="font-bold text-amber-300">{item.name}</span>
+                                                            <p className="text-[10px] text-slate-400">💡 {item.hint}</p>
+                                                        </div>
+                                                        <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded font-bold text-xs">
+                                                            {item.quantity} stk.
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={() => setAiAnalysisResult(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl text-xs font-bold transition">
+                                                Annuller
+                                            </button>
+                                            <button onClick={saveAiBox} className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 py-3 rounded-xl text-xs font-bold transition shadow-lg">
+                                                Gem Kasse Fast ✓
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -428,7 +607,7 @@
                                     </div>
                                     <h2 className="text-xl font-extrabold text-white">FindIt PRO</h2>
                                     <p className="text-sm text-slate-300">
-                                        Få ubegrænsede kasser, QR-label print og fast sky-synkronisering. Kun 29 kr./md.
+                                        Få ubegrænsede kasser, AI-mængdestyring, QR-label print og fast sky-synkronisering. Kun 29 kr./md.
                                     </p>
                                     <div className="pt-2">
                                         <button 
@@ -466,7 +645,7 @@
                             <span className="text-lg">🔎</span> Søgning
                         </button>
                         <button onClick={() => setActiveTab('scan')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'scan' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
-                            <span className="text-lg">📷</span> Skan Kasse
+                            <span className="text-lg">📸</span> AI Skan
                         </button>
                         <button onClick={() => setActiveTab('loans')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'loans' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">📋</span> Udlån
@@ -580,7 +759,7 @@
                                                     const formatted = newCustomCode.trim().toUpperCase();
                                                     if (!adminCustomCodes.includes(formatted)) {
                                                         setAdminCustomCodes([...adminCustomCodes, formatted]);
-                                                        setNewCustomCode('');
+                                                        newCustomCode('');
                                                         alert('Ny rabatkode oprettet: ' + formatted);
                                                     } else {
                                                         alert('Koden findes allerede.');
@@ -645,8 +824,8 @@
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </main>
                 </div>
             );
         }
