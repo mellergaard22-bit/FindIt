@@ -23,7 +23,7 @@
             try {
                 return JSON.parse(value);
             } catch (error) {
-                console.warn('Kunne ikke parse JSON fra localStorage:', error);
+                console.warn('Kunne ikke parse JSON:', error);
                 return fallback;
             }
         };
@@ -118,11 +118,10 @@
                 setAuthError('');
                 setShowDeviceLimitModal(false);
                 
-                const deviceId = 'dev-' + Date.now();
                 setActiveDevices(prev => [
                     ...prev,
                     {
-                        id: deviceId,
+                        id: 'dev-' + Date.now(),
                         name: navigator.userAgent.includes('Mobile') ? 'Mobil enhed' : 'Computer / Browser',
                         lastActive: 'Lige nu'
                     }
