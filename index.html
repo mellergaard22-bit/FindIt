@@ -1,3 +1,381 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FindIt - Værkøjs- og Kassestyring</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const safeParseJSON = (value, fallback) => {
+            if (!value) return fallback;
+            try {
+                return JSON.parse(value);
+            } catch (error) {
+                console.warn('Kunne ikke parse JSON fra localStorage:', error);
+                return fallback;
+            }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isLoginView, setIsLoginView] = useState(true);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [authError, setAuthError] = useState('');
+
+            const [showDeviceLimitModal, setShowDeviceLimitModal] = useState(false);
+            const [activeDevices, setActiveDevices] = useState([
+                { id: 'dev-1', name: 'iPhone 15 Pro (Denne enhed)', lastActive: 'Lige nu' },
+                { id: 'dev-2', name: 'iPad Værksted', lastActive: 'I går' },
+                { id: 'dev-3', name: 'Samsung Galaxy S22', lastActive: 'For 3 dage siden' }
+            ]);
+
+            const [activeTab, setActiveTab] = useState('search');
+            const [searchQuery, setSearchQuery] = useState('');
+            
+            const [boxes, setBoxes] = useState(() => {
+                const saved = localStorage.getItem('findit_boxes');
+                const parsed = safeParseJSON(saved, null);
+                if (parsed && Array.isArray(parsed)) return parsed;
+                return [
+                    {
+                        id: 'box-1',
+                        title: 'Kasse 4 - El-stumper & Ledninger',
+                        location: 'Værksted - Reol B',
+                        image: 'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=600&q=80',
+                        items: [
+                            { name: 'Gaffatape', quantity: 4, synonyms: ['sølvtape', 'duct tape', 'tape'], category: 'Forbrug', hint: 'Øverst i højre hjørne' },
+                            { name: 'Stikdåse 3-vejs', quantity: 2, synonyms: ['forlængerled', 'strømskinne'], category: 'El', hint: 'Midt i kassen' }
+                        ]
+                    }
+                ];
+            });
+
+            const [loans, setLoans] = useState([
+                { id: '1', item: 'Stiksav', borrower: 'Henrik Nabo', date: '2026-05-10', returned: false }
+            ]);
+
+            const [shoppingList, setShoppingList] = useState([
+                { id: '1', item: 'Gaffatape (sidste rulle brugt)', checked: false }
+            ]);
+
+            const [isPro, setIsPro] = useState(false);
+            const [showMobilePayModal, setShowMobilePayModal] = useState(false);
+            const [mobileNumber, setMobileNumber] = useState('');
+            const [payStep, setPayStep] = useState('input');
+            const [discountCode, setDiscountCode] = useState('');
+            const [codeMessage, setCodeMessage] = useState('');
+
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
+            const [capturedImage, setCapturedImage] = useState(null);
+
+            const [logoClicks, setLogoClicks] = useState(0);
+            const [showAdminModal, setShowAdminModal] = useState(false);
+            const [adminCodeInput, setAdminCodeInput] = useState('');
+            const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+            const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
+            const [newCustomCode, setNewCustomCode] = useState('');
+            
+            const [allUsers, setAllUsers] = useState([
+                { email: 'martin_meller@hotmail.com', role: 'Admin / PRO', joined: '2026-10-01' },
+                { email: 'testbruger@vaerksted.dk', role: 'Gratis (3 kasser)', joined: '2026-10-22' },
+                { email: 'henrik.nabo@byg.dk', role: 'PRO Abonnement', joined: '2026-10-23' }
+            ]);
+
+            useEffect(() => {
+                try {
+                    localStorage.setItem('findit_boxes', JSON.stringify(boxes));
+                } catch (error) {
+                    console.warn('Kunne ikke gemme boxes:', error);
+                }
+            }, [boxes]);
+
+            useEffect(() => {
+                const savedUser = localStorage.getItem('findit_user');
+                const parsedUser = safeParseJSON(savedUser, null);
+                if (parsedUser) {
+                    setUser(parsedUser);
+                }
+            }, []);
+
+            const completeLogin = (userEmail) => {
+                const newUser = { email: userEmail, uid: 'user_' + Date.now() };
+                setUser(newUser);
+                localStorage.setItem('findit_user', JSON.stringify(newUser));
+                setAuthError('');
+                setShowDeviceLimitModal(false);
+                
+                const deviceId = 'dev-' + Date.now();
+                setActiveDevices(prev => [
+                    ...prev,
+                    {
+                        id: deviceId,
+                        name: navigator.userAgent.includes('Mobile') ? 'Mobil enhed' : 'Computer / Browser',
+                        lastActive: 'Lige nu'
+                    }
+                ].slice(-3));
+            };
+
+            const completeSignup = (userEmail) => {
+                const existingUser = allUsers.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+                if (existingUser) {
+                    setAuthError('Der findes allerede en bruger med den e-mail.');
+                    return;
+                }
+                const newUser = { 
+                    email: userEmail, 
+                    role: 'Gratis (3 kasser)', 
+                    joined: new Date().toISOString().slice(0, 10) 
+                };
+                setAllUsers(prev => [...prev, newUser]);
+                completeLogin(userEmail);
+            };
+
+            const handleAuthSubmit = (e) => {
+                e.preventDefault();
+                if (!email || !password) {
+                    setAuthError('Udfyld venligst alle felter');
+                    return;
+                }
+                if (!isLoginView) {
+                    completeSignup(email);
+                    return;
+                }
+                if (activeDevices.length >= 3) {
+                    setShowDeviceLimitModal(true);
+                    return;
+                }
+                completeLogin(email);
+            };
+
+            const handleBiometricLogin = () => {
+                if (!window.PublicKeyCredential) {
+                    alert('Biometrisk login understøttes ikke på denne enhed.');
+                    return;
+                }
+                if (activeDevices.length >= 3) {
+                    setShowDeviceLimitModal(true);
+                    return;
+                }
+                const mockUser = { email: 'martin_meller@hotmail.com', uid: 'user_biometric_123' };
+                setUser(mockUser);
+                localStorage.setItem('findit_user', JSON.stringify(mockUser));
+                setActiveDevices(prev => [
+                    ...prev,
+                    { id: 'dev-' + Date.now(), name: 'Biometrisk enhed', lastActive: 'Lige nu' }
+                ].slice(-3));
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+                localStorage.removeItem('findit_user');
+            };
+
+            const handleLogoClick = () => {
+                const newClicks = logoClicks + 1;
+                setLogoClicks(newClicks);
+                if (newClicks >= 15) {
+                    setLogoClicks(0);
+                    setShowAdminModal(true);
+                }
+                setTimeout(() => setLogoClicks(0), 4000);
+            };
+
+            const handleDiscountSubmit = (e) => {
+                e.preventDefault();
+                const code = discountCode.trim().toUpperCase();
+                
+                if (code === '06161821') {
+                    setIsAdminLoggedIn(true);
+                    setShowAdminModal(true);
+                    setCodeMessage('Admin-adgang godkendt!');
+                    return;
+                }
+
+                if (adminCustomCodes.includes(code)) {
+                    setIsPro(true);
+                    setCodeMessage('Rabatkode godkendt! Du har nu fuld PRO-adgang.');
+                    setDiscountCode('');
+                } else {
+                    setCodeMessage('Ugyldig rabatkode.');
+                }
+            };
+
+            const triggerMobilePay = (e) => {
+                e.preventDefault();
+                if (mobileNumber.length < 8) {
+                    alert('Indtast venligst et gyldigt mobilnummer');
+                    return;
+                }
+                setPayStep('waiting');
+                setTimeout(() => {
+                    setPayStep('success');
+                    setTimeout(() => {
+                        setIsPro(true);
+                        setShowMobilePayModal(false);
+                        setPayStep('input');
+                        setMobileNumber('');
+                    }, 2000);
+                }, 2500);
+            };
+
+            const updateItemQuantity = (boxId, itemIdx, delta) => {
+                setBoxes(prevBoxes =>
+                    prevBoxes.map(box => {
+                        if (box.id !== boxId) return box;
+                        const updatedItems = [...box.items];
+                        const currentQty = updatedItems[itemIdx].quantity || 1;
+                        const newQty = Math.max(0, currentQty + delta);
+                        updatedItems[itemIdx] = { ...updatedItems[itemIdx], quantity: newQty };
+                        return { ...box, items: updatedItems };
+                    })
+                );
+            };
+
+            const simulateAiScan = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCapturedImage(reader.result);
+                    setIsAnalyzing(true);
+                    
+                    setTimeout(() => {
+                        setIsAnalyzing(false);
+                        setAiAnalysisResult({
+                            title: 'Kasse - Registreret via AI',
+                            location: 'Værksted - Hovedreol',
+                            items: [
+                                { name: 'Gaffatape Ruller', quantity: 4, category: 'Forbrug', hint: 'Ligger i venstre side' },
+                                { name: 'Bajonetsavklinger (Metal)', quantity: 3, category: 'Tilbehør', hint: 'I aflang æske' },
+                                { name: 'Kabelsko 2.5mm', quantity: 25, category: 'El', hint: 'I lille sorteringsboks' }
+                            ]
+                        });
+                    }, 2500);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const saveAiBox = () => {
+                if (!aiAnalysisResult) return;
+                const newBox = {
+                    id: 'box-' + Date.now(),
+                    title: aiAnalysisResult.title,
+                    location: aiAnalysisResult.location,
+                    image: capturedImage || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                    items: aiAnalysisResult.items
+                };
+                setBoxes(prevBoxes => [newBox, ...prevBoxes]);
+                alert('Kasse og AI-analyseret indhold gemt!');
+                setAiAnalysisResult(null);
+                setCapturedImage(null);
+                setActiveTab('search');
+            };
+
+            const filteredBoxes = boxes.filter(box => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                const matchTitle = box.title.toLowerCase().includes(q) || box.location.toLowerCase().includes(q);
+                const matchItem = box.items.some(i => 
+                    i.name.toLowerCase().includes(q) || 
+                    i.category.toLowerCase().includes(q) ||
+                    (i.synonyms && i.synonyms.some(s => s.toLowerCase().includes(q)))
+                );
+                return matchTitle || matchItem;
+            });
+
+            if (!user) {
+                return (
+                    <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center p-6 shadow-2xl relative">
+                        <div className="text-center space-y-3 mb-8">
+                            <div className="w-16 h-16 bg-amber-500 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+                                🔍
+                            </div>
+                            <h1 className="text-2xl font-black">FindIt</h1>
+                            <p className="text-sm text-slate-400">Log ind for at synkronisere dine kasser i skyen</p>
+                        </div>
+
+                        <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 space-y-4 shadow-xl">
+                            {authError && <p className="text-xs text-red-400 text-center">{authError}</p>}
+                            
+                            <form onSubmit={handleAuthSubmit} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-300">E-mail</label>
+                                    <input 
+                                        type="email" 
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="din@email.dk"
+                                        className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-300">Adgangskode</label>
+                                    <input 
+                                        type="password" 
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                                <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 rounded-xl shadow-lg transition">
+                                    {isLoginView ? 'Log ind' : 'Opret konto'}
+                                </button>
+                            </form>
+
+                            <button 
+                                onClick={handleBiometricLogin}
+                                className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition text-sm border border-slate-600"
+                            >
+                                <span>🔒</span> Brug Ansigtsgenkendelse / Fingeraftryk
+                            </button>
+
+                            <div className="text-center pt-2">
+                                <button 
+                                    onClick={() => setIsLoginView(!isLoginView)} 
+                                    className="text-xs text-amber-400 hover:underline"
+                                >
+                                    {isLoginView ? 'Har du ikke en konto? Opret her' : 'Har du allerede en konto? Log ind'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {showDeviceLimitModal && (
+                            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="bg-slate-800 border border-red-500/50 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl text-center">
+                                    <div className="w-14 h-14 bg-red-500/20 text-red-400 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold border border-red-500/30">
+                                        ⚠️
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="font-bold text-lg text-white">Enhedsgrænse nået</h3>
+                                        <p className="text-xs text-slate-400">
+                                            Din konto har allerede maks antal tilladte enheder tilknyttet (3/3). For at logge på her, skal du fjerne en eksisterende enhed.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2 text-left pt-1">
+                                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Aktive enheder:</span>
+                                        {activeDevices.map(dev => (
+                                            <div key={dev.id} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                <div>
+                                                    <span className="font-medium text-slate-200">{dev.name}</span>
+                                                    <p className="text-[10px] text-slate-500">Sidst aktiv: {dev.lastActive}</p>
+                                                </div>
                                                 <button 
                                                     onClick={() => {
                                                         setActiveDevices(prev => prev.filter(d => d.id !== dev.id));
@@ -27,127 +405,463 @@
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col shadow-2xl pb-24">
                     <header className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-20">
-                        <div className="flex items-center gap-2">
+                        <div onClick={handleLogoClick} className="cursor-pointer select-none flex items-center gap-2">
                             <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shadow-md">
                                 🔍
                             </div>
                             <div>
                                 <h1 className="font-bold text-lg leading-tight">FindIt</h1>
-                                <p className="text-xs text-slate-400 truncate max-w-[140px]">{user?.email}</p>
+                                <p className="text-xs text-slate-400 truncate max-w-[120px]">{user.email}</p>
                             </div>
                         </div>
-
-                        <button
-                            onClick={handleLogout}
-                            className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition"
-                        >
-                            Log ud
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {isPro ? (
+                                <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">
+                                    ★ PRO
+                                </span>
+                            ) : (
+                                <button onClick={() => setShowMobilePayModal(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium shadow transition">
+                                    Abonner PRO
+                                </button>
+                            )}
+                            <button onClick={handleLogout} title="Log ud" className="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-700 rounded">
+                                ⎋
+                            </button>
+                        </div>
                     </header>
 
-                    <main className="p-4 space-y-4">
-                        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Søg i kasser og indhold..."
-                                className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-amber-500"
-                            />
-                        </div>
-
-                        <div className="space-y-3">
-                            {filteredBoxes.length === 0 ? (
-                                <div className="text-sm text-slate-400 text-center py-10">
-                                    Ingen kasser fundet.
+                    <main className="flex-1 p-4 overflow-y-auto">
+                        {activeTab === 'search' && (
+                            <div className="space-y-4">
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                                        🔍
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Søg efter ting, kasser eller synonymer..." 
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500 shadow-inner"
+                                    />
+                                    {searchQuery && (
+                                        <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
+                                            ✕
+                                        </button>
+                                    )}
                                 </div>
-                            ) : (
-                                filteredBoxes.map((box) => (
-                                    <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-3xl overflow-hidden shadow-lg">
-                                        <img
-                                            src={box.image}
-                                            alt={box.title}
-                                            className="w-full h-40 object-cover"
-                                        />
-                                        <div className="p-4 space-y-3">
-                                            <div>
-                                                <h2 className="font-bold text-lg">{box.title}</h2>
-                                                <p className="text-xs text-slate-400">{box.location}</p>
+
+                                <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
+                                    {['Gaffatape', 'Karburator', 'Stikdåse', 'Kabelsko'].map((tag) => (
+                                        <button 
+                                            key={tag} 
+                                            onClick={() => setSearchQuery(tag)}
+                                            className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-full whitespace-nowrap text-slate-300 transition"
+                                        >
+                                            #{tag}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="flex justify-between items-center text-xs text-slate-400 pt-2">
+                                    <span>Viser {filteredBoxes.length} kasser</span>
+                                    <span>{boxes.reduce((acc, b) => acc + b.items.reduce((sum, i) => sum + (i.quantity || 1), 0), 0)} genstande total</span>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {filteredBoxes.map((box) => (
+                                        <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-lg hover:border-slate-600 transition">
+                                            <div className="relative h-44 bg-slate-700">
+                                                <img src={box.image} alt={box.title} className="w-full h-full object-cover" />
+                                                <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-lg text-xs font-medium text-amber-400 border border-slate-700">
+                                                    📍 {box.location}
+                                                </div>
                                             </div>
+                                            <div className="p-4 space-y-3">
+                                                <h3 className="font-bold text-base text-slate-100">{box.title}</h3>
+                                                <div className="space-y-2">
+                                                    {box.items.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
+                                                            <div className="space-y-0.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-semibold text-amber-300">{item.name}</span>
+                                                                    <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold border border-amber-500/20">
+                                                                        {item.quantity || 1} stk.
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-400">💡 {item.hint}</p>
+                                                            </div>
+                                                            
+                                                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, -1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <span className="w-6 text-center text-xs font-bold text-white">{item.quantity || 1}</span>
+                                                                <button 
+                                                                    onClick={() => updateItemQuantity(box.id, idx, 1)}
+                                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-                                            <div className="space-y-2">
-                                                {box.items.map((item, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className="bg-slate-900 border border-slate-700 rounded-2xl p-3 flex items-start justify-between gap-3"
-                                                    >
+                        {activeTab === 'scan' && (
+                            <div className="space-y-6 text-center py-4">
+                                {!isAnalyzing && !aiAnalysisResult && (
+                                    <div className="bg-slate-800 border-2 border-dashed border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center space-y-4">
+                                        <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400 text-3xl">
+                                            📸
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-white">AI Billedscanner & Tæller</h3>
+                                            <p className="text-sm text-slate-400 mt-1">Tag et billede af kassen. AI'en registrerer indhold og tæller antallet af f.eks. ruller.</p>
+                                        </div>
+                                        
+                                        {!isPro && boxes.length >= 3 && (
+                                            <p className="text-xs text-red-400 font-medium bg-red-950/40 p-2.5 rounded-xl border border-red-900/50 w-full">
+                                                Du har nået grænsen på 3 kasser i gratisversionen. <button onClick={() => setShowMobilePayModal(true)} className="underline text-amber-400">Abonner på PRO</button>
+                                            </p>
+                                        )}
+
+                                        <label className={`w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 px-6 rounded-xl shadow-lg transition cursor-pointer inline-block ${!isPro && boxes.length >= 3 ? 'opacity-50 pointer-events-none' : ''}`}>
+                                            <span>Tag billede / Upload kasse</span>
+                                            <input type="file" accept="image/*" capture="environment" onChange={simulateAiScan} className="hidden" />
+                                        </label>
+                                    </div>
+                                )}
+
+                                {isAnalyzing && (
+                                    <div className="bg-slate-800 border border-slate-700 rounded-3xl p-10 space-y-5 text-center">
+                                        <div className="w-14 h-14 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                        <div className="space-y-1">
+                                            <h3 className="font-bold text-base text-white">Gemmer & Analyserer billede...</h3>
+                                            <p className="text-xs text-slate-400">AI tæller genstande og identificerer indhold.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {aiAnalysisResult && (
+                                    <div className="bg-slate-800 border border-amber-500/40 rounded-3xl p-5 space-y-4 text-left shadow-2xl">
+                                        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+                                            <h3 className="font-bold text-sm text-amber-400">✨ AI Analyse Gennemført</h3>
+                                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Klar til lagring</span>
+                                        </div>
+                                        {capturedImage && (
+                                            <img src={capturedImage} alt="Scanned box" className="w-full h-36 object-cover rounded-xl border border-slate-700" />
+                                        )}
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400">Kassenavn</label>
+                                            <input 
+                                                type="text" 
+                                                value={aiAnalysisResult.title}
+                                                onChange={(e) => setAiAnalysisResult({...aiAnalysisResult, title: e.target.value})}
+                                                className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400">Registreret indhold & antal:</label>
+                                            <div className="space-y-1.5">
+                                                {aiAnalysisResult.items.map((item, i) => (
+                                                    <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
                                                         <div>
-                                                            <p className="font-medium text-sm">{item.name}</p>
-                                                            <p className="text-xs text-slate-400">
-                                                                Kategori: {item.category} · Stk: {item.quantity ?? 1}
-                                                            </p>
-                                                            {item.hint && (
-                                                                <p className="text-[11px] text-amber-400 mt-1">
-                                                                    {item.hint}
-                                                                </p>
-                                                            )}
+                                                            <span className="font-bold text-amber-300">{item.name}</span>
+                                                            <p className="text-[10px] text-slate-400">💡 {item.hint}</p>
                                                         </div>
-
-                                                        <div className="flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => updateItemQuantity(box.id, idx, -1)}
-                                                                className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold"
-                                                            >
-                                                                −
-                                                            </button>
-                                                            <button
-                                                                onClick={() => updateItemQuantity(box.id, idx, 1)}
-                                                                className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
+                                                        <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded font-bold text-xs">
+                                                            {item.quantity} stk.
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={() => setAiAnalysisResult(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl text-xs font-bold transition">
+                                                Annuller
+                                            </button>
+                                            <button onClick={saveAiBox} className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 py-3 rounded-xl text-xs font-bold transition shadow-lg">
+                                                Gem Kasse Fast ✓
+                                            </button>
+                                        </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
 
-                        <div className="bg-slate-800 border border-slate-700 rounded-3xl p-4 space-y-3">
-                            <h3 className="font-semibold">AI-scan</h3>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={simulateAiScan}
-                                className="block w-full text-sm text-slate-300"
-                            />
-                            {isAnalyzing && (
-                                <p className="text-xs text-amber-400">Analyserer billede...</p>
-                            )}
-                            {aiAnalysisResult && (
-                                <div className="space-y-2">
-                                    <p className="text-sm text-slate-300">
-                                        {aiAnalysisResult.title}
-                                    </p>
-                                    <button
-                                        onClick={saveAiBox}
-                                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl text-sm"
-                                    >
-                                        Gem kasse
-                                    </button>
+                        {activeTab === 'loans' && (
+                            <div className="space-y-4">
+                                <h2 className="text-lg font-bold">Udlån & Indkøbsliste</h2>
+                                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-3">
+                                    <h3 className="font-semibold text-sm text-amber-400">Udlånte ting</h3>
+                                    {loans.map(loan => (
+                                        <div key={loan.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800 text-sm">
+                                            <div>
+                                                <span className="font-medium">{loan.item}</span>
+                                                <p className="text-xs text-slate-400">Lånt ud til: {loan.borrower} ({loan.date})</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => setLoans(loans.filter(l => l.id !== loan.id))}
+                                                className="text-xs bg-emerald-600/20 text-emerald-400 px-2.5 py-1 rounded border border-emerald-500/30"
+                                            >
+                                                Afleveret ✓
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-3">
+                                    <h3 className="font-semibold text-sm text-amber-400">Byggemarked Indkøbsliste</h3>
+                                    {shoppingList.map(item => (
+                                        <div key={item.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800 text-sm">
+                                            <span>{item.item}</span>
+                                            <button 
+                                                onClick={() => setShoppingList(shoppingList.filter(i => i.id !== item.id))}
+                                                className="text-xs text-slate-400 hover:text-white"
+                                            >
+                                                Slet ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'pro' && (
+                            <div className="space-y-6 py-2">
+                                <div className="bg-gradient-to-br from-amber-500/20 to-slate-800 border border-amber-500/40 rounded-3xl p-6 text-center space-y-3">
+                                    <div className="w-14 h-14 bg-amber-500 text-slate-900 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold shadow-lg">
+                                        ★
+                                    </div>
+                                    <h2 className="text-xl font-extrabold text-white">FindIt PRO</h2>
+                                    <p className="text-sm text-slate-300">
+                                        Få ubegrænsede kasser, AI-mængdestyring, QR-label print og fast sky-synkronisering. Kun 29 kr./md.
+                                    </p>
+                                    <div className="pt-2">
+                                        <button 
+                                            onClick={() => setShowMobilePayModal(true)}
+                                            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 px-6 rounded-xl shadow-lg transition"
+                                        >
+                                            Start abonnement (29 kr./md.)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
+                                    <h3 className="font-semibold text-sm text-slate-200">Har du en rabatkode?</h3>
+                                    <form onSubmit={handleDiscountSubmit} className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={discountCode}
+                                            onChange={(e) => setDiscountCode(e.target.value)}
+                                            placeholder="Indtast kode her..."
+                                            className="flex-1 bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm uppercase text-slate-100 focus:outline-none focus:border-amber-500"
+                                        />
+                                        <button type="submit" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-sm font-medium transition">
+                                            Indløs
+                                        </button>
+                                    </form>
+                                    {codeMessage && <p className="text-xs text-amber-400">{codeMessage}</p>}
+                                </div>
+                            </div>
+                        )}
                     </main>
+
+                    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-800 border-t border-slate-700 flex justify-around p-3 z-20">
+                        <button onClick={() => setActiveTab('search')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'search' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-lg">🔎</span> Søgning
+                        </button>
+                        <button onClick={() => setActiveTab('scan')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'scan' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-lg">📸</span> AI Skan
+                        </button>
+                        <button onClick={() => setActiveTab('loans')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'loans' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-lg">📋</span> Udlån
+                        </button>
+                        <button onClick={() => setActiveTab('pro')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'pro' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-lg">★</span> PRO
+                        </button>
+                    </nav>
+
+                    {showMobilePayModal && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-6 space-y-5 shadow-2xl relative">
+                                <button onClick={() => { setShowMobilePayModal(false); setPayStep('input'); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                <div className="text-center space-y-1">
+                                    <div className="w-12 h-12 bg-red-600 text-white rounded-2xl mx-auto flex items-center justify-center font-bold text-xl shadow">M</div>
+                                    <h3 className="font-bold text-lg">MobilePay Abonnement</h3>
+                                    <p className="text-xs text-slate-400">FindIt PRO (Løbende månedligt)</p>
+                                </div>
+                                {payStep === 'input' && (
+                                    <form onSubmit={triggerMobilePay} className="space-y-4">
+                                        <div className="bg-slate-900 p-4 rounded-2xl border border-slate-700 text-center">
+                                            <span className="text-xs text-slate-400">Pris pr. måned</span>
+                                            <div className="text-2xl font-black text-amber-400">29,00 kr. <span className="text-xs text-slate-400 font-normal">/ md.</span></div>
+                                            <p className="text-[10px] text-slate-500 mt-1">Ingen binding. Kan opsiges når som helst.</p>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-slate-300">Indtast dit MobilePay telefonnummer</label>
+                                            <div className="flex rounded-xl overflow-hidden border border-slate-700 bg-slate-900">
+                                                <span className="bg-slate-800 px-3 py-3 text-sm text-slate-400 border-r border-slate-700">+45</span>
+                                                <input type="tel" maxLength="8" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} placeholder="12 34 56 78" className="w-full bg-transparent px-3 py-3 text-sm focus:outline-none text-slate-100" />
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition">Godkend månedligt abonnement</button>
+                                    </form>
+                                )}
+                                {payStep === 'waiting' && (
+                                    <div className="text-center py-8 space-y-4">
+                                        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                        <p className="text-sm font-medium text-slate-200">Åbn din MobilePay app og godkend...</p>
+                                    </div>
+                                )}
+                                {payStep === 'success' && (
+                                    <div className="text-center py-8 space-y-3">
+                                        <div className="w-14 h-14 bg-emerald-600 text-white rounded-full mx-auto flex items-center justify-center text-2xl font-bold">✓</div>
+                                        <h4 className="font-bold text-lg text-emerald-400">Abonnement oprettet!</h4>
+                                        <p className="text-xs text-slate-400">Du har nu fuld PRO-adgang.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {showAdminModal && (
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-amber-500/50 w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                                <button onClick={() => { setShowAdminModal(false); setIsAdminLoggedIn(false); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                {!isAdminLoggedIn ? (
+                                    <form onSubmit={(e) => { e.preventDefault(); if(adminCodeInput === '06161821') setIsAdminLoggedIn(true); else alert('Forkert kode'); }} className="space-y-4 py-4">
+                                        <div className="text-center space-y-1">
+                                            <div className="text-3xl">🔐</div>
+                                            <h3 className="font-bold text-lg text-amber-400">Administrator-adgang</h3>
+                                            <p className="text-xs text-slate-400">Indtast din 8-cifrede admin-kode</p>
+                                        </div>
+                                        <input type="password" maxLength="8" value={adminCodeInput} onChange={(e) => setAdminCodeInput(e.target.value)} placeholder="8-cifret kode" className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-center text-lg tracking-widest text-slate-100 focus:outline-none focus:border-amber-500" />
+                                        <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 rounded-xl transition">Log ind</button>
+                                    </form>
+                                ) : (
+                                    <div className="space-y-5">
+                                        <div className="border-b border-slate-700 pb-3 flex justify-between items-center">
+                                            <h3 className="font-bold text-base text-amber-400">📊 FindIt - Admin & Forretning</h3>
+                                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Superadmin</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Brugere i alt</span>
+                                                <div className="text-lg font-bold text-white mt-1">{allUsers.length}</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Betalende PRO</span>
+                                                <div className="text-lg font-bold text-emerald-400 mt-1">2</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Est. MRR (Omsætning)</span>
+                                                <div className="text-sm font-black text-amber-400 mt-1.5">58 kr./md.</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-700 space-y-2.5">
+                                            <h4 className="text-xs font-semibold text-slate-200">🎫 Administrer Rabatkoder</h4>
+                                            <div className="flex flex-wrap gap-1.5 pb-1">
+                                                {adminCustomCodes.map((c, i) => (
+                                                    <span key={i} className="bg-slate-800 text-amber-300 text-xs px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5">
+                                                        {c}
+                                                        <button 
+                                                            onClick={() => setAdminCustomCodes(adminCustomCodes.filter(code => code !== c))}
+                                                            className="text-slate-500 hover:text-red-400 text-[10px]"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (newCustomCode.trim()) {
+                                                    const formatted = newCustomCode.trim().toUpperCase();
+                                                    if (!adminCustomCodes.includes(formatted)) {
+                                                        setAdminCustomCodes([...adminCustomCodes, formatted]);
+                                                        setNewCustomCode('');
+                                                        alert('Ny rabatkode oprettet: ' + formatted);
+                                                    } else {
+                                                        alert('Koden findes allerede.');
+                                                    }
+                                                }
+                                            }} className="flex gap-2 pt-1">
+                                                <input 
+                                                    type="text" 
+                                                    value={newCustomCode}
+                                                    onChange={(e) => setNewCustomCode(e.target.value)}
+                                                    placeholder="F.eks. SOMMER2026..." 
+                                                    className="flex-1 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs uppercase text-slate-100 focus:outline-none focus:border-amber-500"
+                                                />
+                                                <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                                    Tilføj kode
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-semibold text-slate-300">👥 Registrerede Brugere:</h4>
+                                            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                                                {allUsers.map((u, idx) => (
+                                                    <div key={idx} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                        <div>
+                                                            <span className="font-medium text-slate-200">{u.email}</span>
+                                                            <p className="text-[10px] text-slate-400">Oprettet: {u.joined}</p>
+                                                        </div>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${u.role.includes('PRO') || u.role.includes('Admin') ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-300'}`}>
+                                                            {u.role}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-1 flex gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    setIsPro(true);
+                                                    alert('PRO-status aktiveret på denne enhed!');
+                                                }}
+                                                className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 py-2 rounded-xl text-xs font-medium transition text-center"
+                                            >
+                                                ★ Giv PRO til mig
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    if(confirm('Er du sikker på du vil slette alle lagrede kasser?')) {
+                                                        setBoxes([]);
+                                                        localStorage.removeItem('findit_boxes');
+                                                        alert('Alle kasser er slettet.');
+                                                    }
+                                                }}
+                                                className="flex-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 py-2 rounded-xl text-xs font-medium transition text-center"
+                                            >
+                                                🗑 Nulstil kasser
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
