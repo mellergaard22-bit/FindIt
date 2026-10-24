@@ -45,13 +45,35 @@
             ]);
 
             const [isPro, setIsPro] = useState(false);
-            const [discountCode, setDiscountCode] = useState('');
-            const [codeMessage, setCodeMessage] = useState('');
 
             // AI Scan states
             const [isAnalyzing, setIsAnalyzing] = useState(false);
             const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
             const [capturedImage, setCapturedImage] = useState(null);
+
+            // Admin state & metrics
+            const [logoClicks, setLogoClicks] = useState(0);
+            const [showAdminModal, setShowAdminModal] = useState(false);
+            const [adminCodeInput, setAdminCodeInput] = useState('');
+            const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+            const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
+            const [newCustomCode, setNewCustomCode] = useState('');
+            
+            const [allUsers, setAllUsers] = useState([
+                { email: 'martin_meller@hotmail.com', role: 'Admin / PRO', joined: '2026-10-01' },
+                { email: 'testbruger@vaerksted.dk', role: 'Gratis (3 kasser)', joined: '2026-10-22' },
+                { email: 'henrik.nabo@byg.dk', role: 'PRO Abonnement', joined: '2026-10-23' }
+            ]);
+
+            const handleLogoClick = () => {
+                const newClicks = logoClicks + 1;
+                setLogoClicks(newClicks);
+                if (newClicks >= 15) {
+                    setLogoClicks(0);
+                    setShowAdminModal(true);
+                }
+                setTimeout(() => setLogoClicks(0), 4000);
+            };
 
             const updateItemQuantity = (boxId, itemIdx, delta) => {
                 setBoxes(prevBoxes =>
@@ -115,7 +137,7 @@
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col shadow-2xl pb-24">
                     <header className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-20">
-                        <div className="flex items-center gap-2">
+                        <div onClick={handleLogoClick} className="cursor-pointer select-none flex items-center gap-2">
                             <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shadow-md">
                                 🔍
                             </div>
@@ -294,6 +316,76 @@
                             <span className="text-lg">★</span> PRO
                         </button>
                     </nav>
+
+                    {/* Admin Modal */}
+                    {showAdminModal && (
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-amber-500/50 w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                                <button onClick={() => { setShowAdminModal(false); setIsAdminLoggedIn(false); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                {!isAdminLoggedIn ? (
+                                    <form onSubmit={(e) => { e.preventDefault(); if(adminCodeInput === '06161821') setIsAdminLoggedIn(true); else alert('Forkert kode'); }} className="space-y-4 py-4">
+                                        <div className="text-center space-y-1">
+                                            <div className="text-3xl">🔐</div>
+                                            <h3 className="font-bold text-lg text-amber-400">Administrator-adgang</h3>
+                                            <p className="text-xs text-slate-400">Indtast din admin-kode</p>
+                                        </div>
+                                        <input type="password" maxLength="8" value={adminCodeInput} onChange={(e) => setAdminCodeInput(e.target.value)} placeholder="8-cifret kode" className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-center text-lg tracking-widest text-slate-100 focus:outline-none focus:border-amber-500" />
+                                        <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 rounded-xl transition">Log ind</button>
+                                    </form>
+                                ) : (
+                                    <div className="space-y-5">
+                                        <div className="border-b border-slate-700 pb-3 flex justify-between items-center">
+                                            <h3 className="font-bold text-base text-amber-400">📊 FindIt - Admin & Forretning</h3>
+                                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Superadmin</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Brugere i alt</span>
+                                                <div className="text-lg font-bold text-white mt-1">{allUsers.length}</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Betalende PRO</span>
+                                                <div className="text-lg font-bold text-emerald-400 mt-1">2</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Est. MRR (Omsætning)</span>
+                                                <div className="text-sm font-black text-amber-400 mt-1.5">58 kr./md.</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-700 space-y-2.5">
+                                            <h4 className="text-xs font-semibold text-slate-200">🎫 Administrer Rabatkoder</h4>
+                                            <div className="flex flex-wrap gap-1.5 pb-1">
+                                                {adminCustomCodes.map((c, i) => (
+                                                    <span key={i} className="bg-slate-800 text-amber-300 text-xs px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5">
+                                                        {c}
+                                                        <button onClick={() => setAdminCustomCodes(adminCustomCodes.filter(code => code !== c))} className="text-slate-500 hover:text-red-400 text-[10px]">✕</button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (newCustomCode.trim()) {
+                                                    const formatted = newCustomCode.trim().toUpperCase();
+                                                    if (!adminCustomCodes.includes(formatted)) {
+                                                        setAdminCustomCodes([...adminCustomCodes, formatted]);
+                                                        setNewCustomCode('');
+                                                        alert('Ny rabatkode oprettet: ' + formatted);
+                                                    } else {
+                                                        alert('Koden findes allerede.');
+                                                    }
+                                                }
+                                            }} className="flex gap-2 pt-1">
+                                                <input type="text" value={newCustomCode} onChange={(e) => setNewCustomCode(e.target.value)} placeholder="F.eks. SOMMER2026..." className="flex-1 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs uppercase text-slate-100" />
+                                                <button type="submit" className="bg-amber-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold">Tilføj</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
