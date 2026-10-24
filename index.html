@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skur & Skuffe</title>
+    <title>FindIt</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -30,9 +30,9 @@
             const [activeTab, setActiveTab] = useState('search');
             const [searchQuery, setSearchQuery] = useState('');
             
-            // Persistent Boxes in localStorage (simulating cloud database)
+            // Persistent Boxes in localStorage
             const [boxes, setBoxes] = useState(() => {
-                const saved = localStorage.getItem('skur_boxes');
+                const saved = localStorage.getItem('findit_boxes');
                 if (saved) return JSON.parse(saved);
                 return [
                     {
@@ -68,30 +68,26 @@
             const [showAdminModal, setShowAdminModal] = useState(false);
             const [adminCodeInput, setAdminCodeInput] = useState('');
             const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-            const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'SKURPRO', 'FALCK']);
+            const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
 
-            // Save boxes to localStorage whenever they change
             useEffect(() => {
-                localStorage.setItem('skur_boxes', JSON.stringify(boxes));
+                localStorage.setItem('findit_boxes', JSON.stringify(boxes));
             }, [boxes]);
 
-            // Check if user was previously logged in
             useEffect(() => {
-                const savedUser = localStorage.getItem('skur_user');
+                const savedUser = localStorage.getItem('findit_user');
                 if (savedUser) {
                     setUser(JSON.parse(savedUser));
                 }
             }, []);
 
-            // Biometric Login Simulation (FaceID / TouchID)
             const handleBiometricLogin = () => {
                 if (window.PublicKeyCredential) {
-                    // Simulating biometric prompt
-                    const mockUser = { email: 'martin@skur.dk', uid: 'user_biometric_123' };
+                    const mockUser = { email: 'martin@findit.dk', uid: 'user_biometric_123' };
                     setUser(mockUser);
-                    localStorage.setItem('skur_user', JSON.stringify(mockUser));
+                    localStorage.setItem('findit_user', JSON.stringify(mockUser));
                 } else {
-                    alert('Biometrisk login understøttes ikke på denne enhed. Brug e-mail/adgangskode.');
+                    alert('Biometrisk login understøttes ikke på denne enhed.');
                 }
             };
 
@@ -103,13 +99,13 @@
                 }
                 const newUser = { email, uid: 'user_' + Date.now() };
                 setUser(newUser);
-                localStorage.setItem('skur_user', JSON.stringify(newUser));
+                localStorage.setItem('findit_user', JSON.stringify(newUser));
                 setAuthError('');
             };
 
             const handleLogout = () => {
                 setUser(null);
-                localStorage.removeItem('skur_user');
+                localStorage.removeItem('findit_user');
             };
 
             const handleLogoClick = () => {
@@ -133,7 +129,7 @@
                     return;
                 }
 
-                if (adminCustomCodes.includes(code) || ['GRATIS100', 'VENNER', 'SKURPRO', 'FALCK'].includes(code)) {
+                if (adminCustomCodes.includes(code) || ['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK'].includes(code)) {
                     setIsPro(true);
                     setCodeMessage('Rabatkode godkendt! Du har nu fuld PRO-adgang.');
                     setDiscountCode('');
@@ -172,15 +168,14 @@
                 return matchTitle || matchItem;
             });
 
-            // If not logged in, show Login / Register Screen
             if (!user) {
                 return (
                     <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center p-6 shadow-2xl">
                         <div className="text-center space-y-3 mb-8">
                             <div className="w-16 h-16 bg-amber-500 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-                                📦
+                                🔍
                             </div>
-                            <h1 className="text-2xl font-black">Skur & Skuffe</h1>
+                            <h1 className="text-2xl font-black">FindIt</h1>
                             <p className="text-sm text-slate-400">Log ind for at synkronisere dine kasser i skyen</p>
                         </div>
 
@@ -213,7 +208,6 @@
                                 </button>
                             </form>
 
-                            {/* Biometric Login Button */}
                             <button 
                                 onClick={handleBiometricLogin}
                                 className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition text-sm border border-slate-600"
@@ -240,10 +234,10 @@
                     <header className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-20">
                         <div onClick={handleLogoClick} className="cursor-pointer select-none flex items-center gap-2">
                             <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shadow-md">
-                                📦
+                                🔍
                             </div>
                             <div>
-                                <h1 className="font-bold text-lg leading-tight">Skur & Skuffe</h1>
+                                <h1 className="font-bold text-lg leading-tight">FindIt</h1>
                                 <p className="text-xs text-slate-400 truncate max-w-[120px]">{user.email}</p>
                             </div>
                         </div>
@@ -251,7 +245,7 @@
                             {isPro ? (
                                 <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">
                                     ★ PRO
-                                </sp>
+                                </span>
                             ) : (
                                 <button onClick={() => setShowMobilePayModal(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium shadow transition">
                                     Opgrader PRO
@@ -423,7 +417,7 @@
                                     <div className="w-14 h-14 bg-amber-500 text-slate-900 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold shadow-lg">
                                         ★
                                     </div>
-                                    <h2 className="text-xl font-extrabold text-white">Skur & Skuffe PRO</h2>
+                                    <h2 className="text-xl font-extrabold text-white">FindIt PRO</h2>
                                     <p className="text-sm text-slate-300">
                                         Få ubegrænsede kasser, QR-label print og fast sky-synkronisering på tværs af enheder.
                                     </p>
@@ -481,7 +475,7 @@
                                 <div className="text-center space-y-1">
                                     <div className="w-12 h-12 bg-red-600 text-white rounded-2xl mx-auto flex items-center justify-center font-bold text-xl shadow">M</div>
                                     <h3 className="font-bold text-lg">MobilePay Betaling</h3>
-                                    <p className="text-xs text-slate-400">Skur & Skuffe PRO (Livstid)</p>
+                                    <p className="text-xs text-slate-400">FindIt PRO (Livstid)</p>
                                 </div>
                                 {payStep === 'input' && (
                                     <form onSubmit={triggerMobilePay} className="space-y-4">
