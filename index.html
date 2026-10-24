@@ -339,7 +339,7 @@
                                     </div>
                                     <button 
                                         onClick={() => {
-                                            if (!isPro && boxes.length >= 5) {
+                                            if (!isPro && boxes.length >= 3) {
                                                 setShowMobilePayModal(true);
                                                 return;
                                             }
@@ -367,7 +367,7 @@
                                 </div>
                                 {!isPro && (
                                     <p className="text-xs text-slate-400">
-                                        Du bruger gratis-versionen ({boxes.length}/5 kasser oprettet). <button onClick={() => setShowMobilePayModal(true)} className="text-amber-400 underline">Få ubegrænset her</button>
+                                        Du bruger gratis-versionen ({boxes.length}/3 kasser oprettet). <button onClick={() => setShowMobilePayModal(true)} className="text-amber-400 underline">Få ubegrænset her</button>
                                     </p>
                                 )}
                             </div>
