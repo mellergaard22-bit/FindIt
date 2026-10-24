@@ -63,12 +63,20 @@
             const [discountCode, setDiscountCode] = useState('');
             const [codeMessage, setCodeMessage] = useState('');
 
-            // Admin state
+            // Admin state & metrics
             const [logoClicks, setLogoClicks] = useState(0);
             const [showAdminModal, setShowAdminModal] = useState(false);
             const [adminCodeInput, setAdminCodeInput] = useState('');
             const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
             const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
+            const [newCustomCode, setNewCustomCode] = useState('');
+            
+            // Simulated user registry for admin stats
+            const [allUsers, setAllUsers] = useState([
+                { email: 'martin_meller@hotmail.com', role: 'Admin / PRO', joined: '2026-10-01' },
+                { email: 'testbruger@vaerksted.dk', role: 'Gratis (3 kasser)', joined: '2026-10-22' },
+                { email: 'henrik.nabo@byg.dk', role: 'PRO Abonnement', joined: '2026-10-23' }
+            ]);
 
             useEffect(() => {
                 localStorage.setItem('findit_boxes', JSON.stringify(boxes));
@@ -77,13 +85,14 @@
             useEffect(() => {
                 const savedUser = localStorage.getItem('findit_user');
                 if (savedUser) {
-                    setUser(JSON.parse(savedUser));
+                    const parsed = JSON.parse(savedUser);
+                    setUser(parsed);
                 }
             }, []);
 
             const handleBiometricLogin = () => {
                 if (window.PublicKeyCredential) {
-                    const mockUser = { email: 'martin@findit.dk', uid: 'user_biometric_123' };
+                    const mockUser = { email: 'martin_meller@hotmail.com', uid: 'user_biometric_123' };
                     setUser(mockUser);
                     localStorage.setItem('findit_user', JSON.stringify(mockUser));
                 } else {
@@ -129,7 +138,7 @@
                     return;
                 }
 
-                if (adminCustomCodes.includes(code) || ['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK'].includes(code)) {
+                if (adminCustomCodes.includes(code)) {
                     setIsPro(true);
                     setCodeMessage('Rabatkode godkendt! Du har nu fuld PRO-adgang.');
                     setDiscountCode('');
@@ -511,10 +520,10 @@
                         </div>
                     )}
 
-                    {/* Admin Modal */}
+                    {/* Udvidet Admin Modal */}
                     {showAdminModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-slate-800 border border-amber-500/50 w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                            <div className="bg-slate-800 border border-amber-500/50 w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
                                 <button onClick={() => { setShowAdminModal(false); setIsAdminLoggedIn(false); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
                                 {!isAdminLoggedIn ? (
                                     <form onSubmit={(e) => { e.preventDefault(); if(adminCodeInput === '06161821') setIsAdminLoggedIn(true); else alert('Forkert kode'); }} className="space-y-4 py-4">
@@ -527,43 +536,110 @@
                                         <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 rounded-xl transition">Log ind</button>
                                     </form>
                                 ) : (
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-base text-amber-400 border-b border-slate-700 pb-3">📊 Admin Dashboard</h3>
-                                        <div className="grid grid-cols-2 gap-3 text-center">
+                                    <div className="space-y-5">
+                                        <div className="border-b border-slate-700 pb-3 flex justify-between items-center">
+                                            <h3 className="font-bold text-base text-amber-400">📊 FindIt - Admin & Forretning</h3>
+                                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Superadmin</span>
+                                        </div>
+
+                                        {/* Nøgletal / Metrics */}
+                                        <div className="grid grid-cols-3 gap-2 text-center">
                                             <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                                                <span className="text-xs text-slate-400">Lagrede Kasser</span>
-                                                <div className="text-xl font-bold text-white mt-1">{boxes.length}</div>
+                                                <span className="text-[10px] text-slate-400">Brugere i alt</span>
+                                                <div className="text-lg font-bold text-white mt-1">{allUsers.length}</div>
                                             </div>
                                             <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                                                <span className="text-xs text-slate-400">Bruger</span>
-                                                <div className="text-xs font-bold text-amber-400 mt-2 truncate">{user.email}</div>
+                                                <span className="text-[10px] text-slate-400">Betalende PRO</span>
+                                                <div className="text-lg font-bold text-emerald-400 mt-1">2</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                                <span className="text-[10px] text-slate-400">Est. MRR (Omsætning)</span>
+                                                <div className="text-sm font-black text-amber-400 mt-1.5">58 kr./md.</div>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2 pt-2">
-                                            <h4 className="text-xs font-semibold text-slate-300">Admin Genveje & Værktøjer:</h4>
-                                            
+                                        {/* Rabatkode administration */}
+                                        <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-700 space-y-2.5">
+                                            <h4 className="text-xs font-semibold text-slate-200">🎫 Administrer Rabatkoder</h4>
+                                            <div className="flex flex-wrap gap-1.5 pb-1">
+                                                {adminCustomCodes.map((c, i) => (
+                                                    <span key={i} className="bg-slate-800 text-amber-300 text-xs px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5">
+                                                        {c}
+                                                        <button 
+                                                            onClick={() => setAdminCustomCodes(adminCustomCodes.filter(code => code !== c))}
+                                                            className="text-slate-500 hover:text-red-400 text-[10px]"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (newCustomCode.trim()) {
+                                                    const formatted = newCustomCode.trim().toUpperCase();
+                                                    if (!adminCustomCodes.includes(formatted)) {
+                                                        setAdminCustomCodes([...adminCustomCodes, formatted]);
+                                                        setNewCustomCode('');
+                                                        alert('Ny rabatkode oprettet: ' + formatted);
+                                                    } else {
+                                                        alert('Koden findes allerede.');
+                                                    }
+                                                }
+                                            }} className="flex gap-2 pt-1">
+                                                <input 
+                                                    type="text" 
+                                                    value={newCustomCode}
+                                                    onChange={(e) => setNewCustomCode(e.target.value)}
+                                                    placeholder="F.eks. SOMMER2026..." 
+                                                    className="flex-1 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs uppercase text-slate-100 focus:outline-none focus:border-amber-500"
+                                                />
+                                                <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                                    Tilføj kode
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                        {/* Brugerliste */}
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-semibold text-slate-300">👥 Registrerede Brugere:</h4>
+                                            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                                                {allUsers.map((u, idx) => (
+                                                    <div key={idx} className="bg-slate-900 p-2.5 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
+                                                        <div>
+                                                            <span className="font-medium text-slate-200">{u.email}</span>
+                                                            <p className="text-[10px] text-slate-400">Oprettet: {u.joined}</p>
+                                                        </div>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${u.role.includes('PRO') || u.role.includes('Admin') ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-300'}`}>
+                                                            {u.role}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* System Genveje */}
+                                        <div className="pt-1 flex gap-2">
                                             <button 
                                                 onClick={() => {
                                                     setIsPro(true);
-                                                    alert('PRO-status aktiveret for denne enhed!');
+                                                    alert('PRO-status aktiveret på denne enhed!');
                                                 }}
-                                                className="w-full bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-medium transition"
+                                                className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 py-2 rounded-xl text-xs font-medium transition text-center"
                                             >
-                                                ★ Giv PRO-status manuelt
+                                                ★ Giv PRO til mig
                                             </button>
-
                                             <button 
                                                 onClick={() => {
-                                                    if(confirm('Er du sikker på du vil slette alle kasser?')) {
+                                                    if(confirm('Er du sikker på du vil slette alle lagrede kasser?')) {
                                                         setBoxes([]);
                                                         localStorage.removeItem('findit_boxes');
                                                         alert('Alle kasser er slettet.');
                                                     }
                                                 }}
-                                                className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 py-2.5 rounded-xl text-xs font-medium transition"
+                                                className="flex-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 py-2 rounded-xl text-xs font-medium transition text-center"
                                             >
-                                                🗑 Nulstil / Slet alle kasser
+                                                🗑 Nulstil kasser
                                             </button>
                                         </div>
                                     </div>
