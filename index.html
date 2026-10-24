@@ -118,7 +118,6 @@
                     return;
                 }
 
-                // Simulerer tjek af enhedsgrænse ved login (maks 3 enheder)
                 if (activeDevices.length >= 3) {
                     setShowDeviceLimitModal(true);
                     return;
@@ -188,7 +187,6 @@
                 }, 2500);
             };
 
-            // Ændre antal (stk) for en genstand i en kasse
             const updateItemQuantity = (boxId, itemIdx, delta) => {
                 setBoxes(boxes.map(box => {
                     if (box.id !== boxId) return box;
@@ -200,7 +198,6 @@
                 }));
             };
 
-            // Simuleret ægte AI-billedanalyse af kassen
             const simulateAiScan = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -311,7 +308,6 @@
                             </div>
                         </div>
 
-                        {/* Enhedsgrænse Modal ved login */}
                         {showDeviceLimitModal && (
                             <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                                 <div className="bg-slate-800 border border-red-500/50 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl text-center">
@@ -361,7 +357,6 @@
 
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col shadow-2xl pb-24">
-                    {/* Top Header */}
                     <header className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-20">
                         <div onClick={handleLogoClick} className="cursor-pointer select-none flex items-center gap-2">
                             <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shadow-md">
@@ -388,7 +383,6 @@
                         </div>
                     </header>
 
-                    {/* Main Content */}
                     <main className="flex-1 p-4 overflow-y-auto">
                         {activeTab === 'search' && (
                             <div className="space-y-4">
@@ -451,12 +445,10 @@
                                                                 <p className="text-xs text-slate-400">💡 {item.hint}</p>
                                                             </div>
                                                             
-                                                            {/* Mængdestyring: plus og minus knapper */}
                                                             <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
                                                                 <button 
                                                                     onClick={() => updateItemQuantity(box.id, idx, -1)}
                                                                     className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
-                                                                    title="Fjern 1 stk"
                                                                 >
                                                                     -
                                                                 </button>
@@ -464,7 +456,6 @@
                                                                 <button 
                                                                     onClick={() => updateItemQuantity(box.id, idx, 1)}
                                                                     className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-slate-200 font-bold text-xs"
-                                                                    title="Tilføj 1 stk"
                                                                 >
                                                                     +
                                                                 </button>
@@ -639,7 +630,6 @@
                         )}
                     </main>
 
-                    {/* Bottom Navigation */}
                     <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-800 border-t border-slate-700 flex justify-around p-3 z-20">
                         <button onClick={() => setActiveTab('search')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'search' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
                             <span className="text-lg">🔎</span> Søgning
@@ -655,7 +645,6 @@
                         </button>
                     </nav>
 
-                    {/* MobilePay Modal */}
                     {showMobilePayModal && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-6 space-y-5 shadow-2xl relative">
@@ -699,7 +688,6 @@
                         </div>
                     )}
 
-                    {/* Udvidet Admin Modal */}
                     {showAdminModal && (
                         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-800 border border-amber-500/50 w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -721,7 +709,6 @@
                                             <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Superadmin</span>
                                         </div>
 
-                                        {/* Nøgletal / Metrics */}
                                         <div className="grid grid-cols-3 gap-2 text-center">
                                             <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
                                                 <span className="text-[10px] text-slate-400">Brugere i alt</span>
@@ -737,7 +724,6 @@
                                             </div>
                                         </div>
 
-                                        {/* Rabatkode administration */}
                                         <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-700 space-y-2.5">
                                             <h4 className="text-xs font-semibold text-slate-200">🎫 Administrer Rabatkoder</h4>
                                             <div className="flex flex-wrap gap-1.5 pb-1">
@@ -759,7 +745,7 @@
                                                     const formatted = newCustomCode.trim().toUpperCase();
                                                     if (!adminCustomCodes.includes(formatted)) {
                                                         setAdminCustomCodes([...adminCustomCodes, formatted]);
-                                                        newCustomCode('');
+                                                        setNewCustomCode('');
                                                         alert('Ny rabatkode oprettet: ' + formatted);
                                                     } else {
                                                         alert('Koden findes allerede.');
@@ -779,7 +765,6 @@
                                             </form>
                                         </div>
 
-                                        {/* Brugerliste */}
                                         <div className="space-y-2">
                                             <h4 className="text-xs font-semibold text-slate-300">👥 Registrerede Brugere:</h4>
                                             <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
@@ -797,7 +782,6 @@
                                             </div>
                                         </div>
 
-                                        {/* System Genveje */}
                                         <div className="pt-1 flex gap-2">
                                             <button 
                                                 onClick={() => {
@@ -825,9 +809,11 @@
                                 )}
                             </div>
                         )}
-                    </main>
-                </div>
-            );
+                    </div>
+                );
+            }
+
+            return null;
         }
 
         ReactDOM.render(<App />, document.getElementById('root'));
