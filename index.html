@@ -84,7 +84,6 @@
                         window.fbFns.onAuthStateChanged(window.firebaseAuth, async (u) => {
                             setUser(u);
                             if (u) {
-                                // Registrer eller tjek enhed ved login (maks 3 enheder logik)
                                 registerDevice(u.uid);
                             }
                         });
@@ -101,7 +100,7 @@
                 const deviceIdKey = 'findit_device_id';
                 let deviceId = localStorage.getItem(deviceIdKey);
                 if (!deviceId) {
-                    deviceId = 'dev_' + Math.random().toString(36.substring(2, 9));
+                    deviceId = 'dev_' + Math.random().toString(36).substring(2, 9);
                     localStorage.setItem(deviceIdKey, deviceId);
                 }
 
@@ -481,7 +480,7 @@
                                 <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-700 space-y-2 text-xs">
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Nuværende abonnement:</span>
-                                        <span className={`font-bold ${isPro ? 'text-amber-400' : 'text-slate-200'}`}>{isPro ? 'FindIt PRO' + ' ★' : 'Gratis version'}</span>
+                                        <span className={`font-bold ${isPro ? 'text-amber-400' : 'text-slate-200'}`}>{isPro ? 'FindIt PRO ★' : 'Gratis version'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Oprettede kasser:</span>
@@ -544,4 +543,23 @@
                                     <div className="space-y-3">
                                         <h3 className="font-bold text-sm text-amber-400">📊 Admin Panel</h3>
                                         <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 space-y-2">
-                                            <h4 className="text-xs font-semibold text-
+                                            <h4 className="text-xs font-semibold text-slate-200">Rabatkoder</h4>
+                                            <div className="flex flex-wrap gap-1">
+                                                {customCodes.map((c, i) => (
+                                                    <span key={i} className="bg-slate-800 text-amber-300 text-[10px] px-2 py-1 rounded border border-slate-700">{c}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
