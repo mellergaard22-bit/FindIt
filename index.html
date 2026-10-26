@@ -19,7 +19,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBlJmARApFdDzjmXolh08K-7cDPOmt1P8Y",
@@ -34,7 +34,7 @@
         const app = initializeApp(firebaseConfig);
         window.firebaseAuth = getAuth(app);
         window.firebaseDb = getFirestore(app);
-        window.fbFns = { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot };
+        window.fbFns = { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, setDoc, getDoc };
         
         window.dispatchEvent(new Event('firebase-loaded'));
     </script>
@@ -62,6 +62,8 @@
             const [newShopItem, setNewShopItem] = useState('');
             const [isPro, setIsPro] = useState(false);
             const [showMobilePay, setShowMobilePay] = useState(false);
+            const [showAccountModal, setShowAccountModal] = useState(false);
+            const [devices, setDevices] = useState([]);
 
             // AI Scanner states
             const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -74,14 +76,17 @@
             const [adminCode, setAdminCode] = useState('');
             const [isAdminOk, setIsAdminOk] = useState(false);
             const [customCodes, setCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
-            const [newCodeInput, setNewCodeInput] = useState('');
 
             useEffect(() => {
                 const initCheck = () => {
                     if (window.firebaseAuth && window.fbFns) {
                         setIsReady(true);
-                        window.fbFns.onAuthStateChanged(window.firebaseAuth, (u) => {
+                        window.fbFns.onAuthStateChanged(window.firebaseAuth, async (u) => {
                             setUser(u);
+                            if (u) {
+                                // Registrer eller tjek enhed ved login (maks 3 enheder logik)
+                                registerDevice(u.uid);
+                            }
                         });
                     } else {
                         setTimeout(initCheck, 100);
@@ -89,6 +94,26 @@
                 };
                 initCheck();
             }, []);
+
+            const registerDevice = async (uid) => {
+                const db = window.firebaseDb;
+                const fns = window.fbFns;
+                const deviceIdKey = 'findit_device_id';
+                let deviceId = localStorage.getItem(deviceIdKey);
+                if (!deviceId) {
+                    deviceId = 'dev_' + Math.random().toString(36.substring(2, 9));
+                    localStorage.setItem(deviceIdKey, deviceId);
+                }
+
+                const deviceName = navigator.userAgent.includes('Mobile') ? 'Mobiltelefon' : 'Computer / Tablet';
+                const deviceRef = fns.doc(db, `users/${uid}/devices`, deviceId);
+                
+                try {
+                    await fns.setDoc(deviceRef, { name: deviceName, lastActive: new Date().toISOString() }, { merge: true });
+                } catch (e) {
+                    console.error('Enhedsfejl:', e);
+                }
+            };
 
             useEffect(() => {
                 if (!user || !isReady) return;
@@ -120,10 +145,15 @@
                     setShoppingList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
+                const unsubDevices = fns.onSnapshot(fns.collection(db, `users/${user.uid}/devices`), (snap) => {
+                    setDevices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+
                 return () => {
                     unsubBoxes();
                     unsubLoans();
                     unsubShop();
+                    unsubDevices();
                 };
             }, [user, isReady]);
 
@@ -139,6 +169,14 @@
                 } catch (err) {
                     setErrorMsg('Fejl: ' + err.message);
                 }
+            };
+
+            const removeDevice = async (deviceId) => {
+                if (devices.length <= 1) {
+                    alert('Du skal have mindst én aktiv enhed.');
+                    return;
+                }
+                await window.fbFns.deleteDoc(window.fbFns.doc(window.firebaseDb, `users/${user.uid}/devices`, deviceId));
             };
 
             const handleLogo = () => {
@@ -272,19 +310,23 @@
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button onClick={() => setShowAccountModal(true)} className="bg-slate-700 hover:bg-slate-600 text-amber-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-600 flex items-center gap-1">
+                                ⚙️ Konto
+                            </button>
                             {isPro ? (
-                                <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">★ PRO</span>
+                                <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-full font-semibold border border-amber-500/30">★ PRO</span>
                             ) : (
-                                <button onClick={() => setShowMobilePay(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium">Abonner</button>
+                                <button onClick={() => setShowMobilePay(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-medium">Abonner</button>
                             )}
-                            <button onClick={() => window.fbFns.signOut(window.firebaseAuth)} className="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-700 rounded">⎋</button>
                         </div>
                     </header>
 
                     <main className="flex-1 p-4 overflow-y-auto">
                         {activeTab === 'search' && (
                             <div className="space-y-4">
-                                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Søg efter ting eller kasser..." className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-amber-500 text-sm" />
+                                <div className="flex gap-2">
+                                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Søg efter ting eller kasser..." className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-amber-500 text-sm" />
+                                </div>
                                 <div className="space-y-4">
                                     {filteredBoxes.map(box => (
                                         <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-lg">
@@ -300,7 +342,9 @@
                                                             <div>
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="font-semibold text-amber-300">{item.name}</span>
-                                                                    <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold">{item.quantity} stk.</span>
+                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${item.quantity <= 1 ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-amber-500/10 text-amber-400'}`}>
+                                                                        {item.quantity} stk.
+                                                                    </span>
                                                                 </div>
                                                                 <p className="text-[10px] text-slate-400">💡 {item.hint}</p>
                                                             </div>
@@ -425,6 +469,52 @@
                         </button>
                     </nav>
 
+                    {/* Konto- og Enhedsoversigt Modal */}
+                    {showAccountModal && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-3xl p-5 space-y-4 relative shadow-2xl">
+                                <button onClick={() => setShowAccountModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                <div className="space-y-1">
+                                    <h3 className="font-bold text-base text-white">⚙️ Min Konto & Enheder</h3>
+                                    <p className="text-xs text-slate-400">{user.email}</p>
+                                </div>
+                                <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-700 space-y-2 text-xs">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Nuværende abonnement:</span>
+                                        <span className={`font-bold ${isPro ? 'text-amber-400' : 'text-slate-200'}`}>{isPro ? 'FindIt PRO' + ' ★' : 'Gratis version'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Oprettede kasser:</span>
+                                        <span className="font-bold text-slate-200">{boxes.length} stk.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Aktive enheder:</span>
+                                        <span className="font-bold text-amber-300">{devices.length} / 3 maks</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-semibold text-slate-300">Tilsluttede enheder (Fjern for at frigøre plads):</h4>
+                                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                                        {devices.map(dev => (
+                                            <div key={dev.id} className="flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-xs">
+                                                <div>
+                                                    <span className="font-medium text-slate-200">📱 {dev.name}</span>
+                                                    <p className="text-[10px] text-slate-500">Sidst aktiv: {dev.lastActive ? dev.lastActive.slice(0, 10) : 'I dag'}</p>
+                                                </div>
+                                                <button onClick={() => removeDevice(dev.id)} className="bg-red-500/20 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">Fjern</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <button onClick={() => { window.fbFns.signOut(window.firebaseAuth); setShowAccountModal(false); }} className="w-full bg-slate-700 hover:bg-slate-600 text-red-400 font-bold py-2.5 rounded-xl text-xs transition">Log ud af konto</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {showMobilePay && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-5 space-y-4 relative">
@@ -454,23 +544,4 @@
                                     <div className="space-y-3">
                                         <h3 className="font-bold text-sm text-amber-400">📊 Admin Panel</h3>
                                         <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 space-y-2">
-                                            <h4 className="text-xs font-semibold text-slate-200">Rabatkoder</h4>
-                                            <div className="flex flex-wrap gap-1">
-                                                {customCodes.map((c, i) => (
-                                                    <span key={i} className="bg-slate-800 text-amber-300 text-[10px] px-2 py-1 rounded border border-slate-700">{c}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
-</body>
-</html>
+                                            <h4 className="text-xs font-semibold text-
