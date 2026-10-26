@@ -11,11 +11,15 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Firebase SDKs -->
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+    <div id="root"></div>
+
+    <!-- Firebase SDK (Modul) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBlJmARApFdDzjmXolh08K-7cDPOmt1P8Y",
@@ -28,32 +32,27 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        window.firebaseAuth = auth;
-        window.firebaseDb = db;
-        window.fbFns = { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, setDoc };
-        window.dispatchEvent(new Event('firebase-ready'));
+        window.firebaseAuth = getAuth(app);
+        window.firebaseDb = getFirestore(app);
+        window.fbFns = { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot };
+        
+        window.dispatchEvent(new Event('firebase-loaded'));
     </script>
-</head>
-<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
-    <div id="root"></div>
 
+    <!-- React App -->
     <script type="text/babel">
         const { useState, useEffect } = React;
 
         function App() {
-            const [firebaseReady, setFirebaseReady] = useState(false);
+            const [isReady, setIsReady] = useState(false);
             const [user, setUser] = useState(null);
             const [isLoginView, setIsLoginView] = useState(true);
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
-            const [authError, setAuthError] = useState('');
+            const [errorMsg, setErrorMsg] = useState('');
 
             const [activeTab, setActiveTab] = useState('search');
             const [searchQuery, setSearchQuery] = useState('');
-            
             const [boxes, setBoxes] = useState([]);
             const [loans, setLoans] = useState([]);
             const [shoppingList, setShoppingList] = useState([]);
@@ -61,50 +60,47 @@
             const [newItemName, setNewItemName] = useState('');
             const [newBorrower, setNewBorrower] = useState('');
             const [newShopItem, setNewShopItem] = useState('');
-
             const [isPro, setIsPro] = useState(false);
-            const [showMobilePayModal, setShowMobilePayModal] = useState(false);
-            const [mobileNumber, setMobileNumber] = useState('');
-            const [payStep, setPayStep] = useState('input');
-            const [discountCode, setDiscountCode] = useState('');
-            const [codeMessage, setCodeMessage] = useState('');
+            const [showMobilePay, setShowMobilePay] = useState(false);
 
-            // AI Scan states
+            // AI Scanner states
             const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
-            const [capturedImage, setCapturedImage] = useState(null);
+            const [aiResult, setAiResult] = useState(null);
+            const [capturedImg, setCapturedImg] = useState(null);
 
-            // Admin state
+            // Admin modal
             const [logoClicks, setLogoClicks] = useState(0);
-            const [showAdminModal, setShowAdminModal] = useState(false);
-            const [adminCodeInput, setAdminCodeInput] = useState('');
-            const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-            const [adminCustomCodes, setAdminCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
-            const [newCustomCode, setNewCustomCode] = useState('');
+            const [showAdmin, setShowAdmin] = useState(false);
+            const [adminCode, setAdminCode] = useState('');
+            const [isAdminOk, setIsAdminOk] = useState(false);
+            const [customCodes, setCustomCodes] = useState(['GRATIS100', 'VENNER', 'FINDITPRO', 'FALCK']);
+            const [newCodeInput, setNewCodeInput] = useState('');
 
             useEffect(() => {
-                const checkFirebase = setInterval(() => {
+                const initCheck = () => {
                     if (window.firebaseAuth && window.fbFns) {
-                        setFirebaseReady(true);
-                        clearInterval(checkFirebase);
+                        setIsReady(true);
                         window.fbFns.onAuthStateChanged(window.firebaseAuth, (u) => {
                             setUser(u);
                         });
+                    } else {
+                        setTimeout(initCheck, 100);
                     }
-                }, 100);
-                return () => clearInterval(checkFirebase);
+                };
+                initCheck();
             }, []);
 
-            // Hent data fra Firestore når bruger er logget ind
             useEffect(() => {
-                if (!user || !firebaseReady) return;
-                
-                const unsubBoxes = window.fbFns.onSnapshot(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/boxes`), (snapshot) => {
-                    const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (!user || !isReady) return;
+                const db = window.firebaseDb;
+                const fns = window.fbFns;
+
+                const unsubBoxes = fns.onSnapshot(fns.collection(db, `users/${user.uid}/boxes`), (snap) => {
+                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     if (data.length > 0) {
                         setBoxes(data);
                     } else {
-                        const defaultBox = {
+                        fns.addDoc(fns.collection(db, `users/${user.uid}/boxes`), {
                             title: 'Kasse 4 - El-stumper & Ledninger',
                             location: 'Værksted - Reol B',
                             image: 'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=600&q=80',
@@ -112,17 +108,16 @@
                                 { name: 'Gaffatape', quantity: 4, category: 'Forbrug', hint: 'Øverst i højre hjørne' },
                                 { name: 'Stikdåse 3-vejs', quantity: 2, category: 'El', hint: 'Midt i kassen' }
                             ]
-                        };
-                        window.fbFns.addDoc(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/boxes`), defaultBox);
+                        });
                     }
                 });
 
-                const unsubLoans = window.fbFns.onSnapshot(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/loans`), (snapshot) => {
-                    setLoans(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+                const unsubLoans = fns.onSnapshot(fns.collection(db, `users/${user.uid}/loans`), (snap) => {
+                    setLoans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
-                const unsubShop = window.fbFns.onSnapshot(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/shopping`), (snapshot) => {
-                    setShoppingList(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+                const unsubShop = fns.onSnapshot(fns.collection(db, `users/${user.uid}/shopping`), (snap) => {
+                    setShoppingList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
                 return () => {
@@ -130,11 +125,11 @@
                     unsubLoans();
                     unsubShop();
                 };
-            }, [user, firebaseReady]);
+            }, [user, isReady]);
 
-            const handleAuth = async (e) => {
+            const handleAuthSubmit = async (e) => {
                 e.preventDefault();
-                setAuthError('');
+                setErrorMsg('');
                 try {
                     if (isLoginView) {
                         await window.fbFns.signInWithEmailAndPassword(window.firebaseAuth, email, password);
@@ -142,60 +137,340 @@
                         await window.fbFns.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
                     }
                 } catch (err) {
-                    setAuthError('Fejl ved login/oprettelse: ' + err.message);
+                    setErrorMsg('Fejl: ' + err.message);
                 }
             };
 
-            const handleLogout = () => {
-                window.fbFns.signOut(window.firebaseAuth);
-            };
-
-            const handleLogoClick = () => {
-                const newClicks = logoClicks + 1;
-                setLogoClicks(newClicks);
-                if (newClicks >= 15) {
+            const handleLogo = () => {
+                const c = logoClicks + 1;
+                setLogoClicks(c);
+                if (c >= 15) {
                     setLogoClicks(0);
-                    setShowAdminModal(true);
+                    setShowAdmin(true);
                 }
                 setTimeout(() => setLogoClicks(0), 4000);
             };
 
-            const updateItemQuantity = async (boxId, itemIdx, delta) => {
+            const updateQty = async (boxId, idx, delta) => {
                 const box = boxes.find(b => b.id === boxId);
                 if (!box) return;
-                const updatedItems = [...box.items];
-                const currentQty = updatedItems[itemIdx].quantity || 1;
-                updatedItems[itemIdx].quantity = Math.max(0, currentQty + delta);
-
-                await window.fbFns.updateDoc(window.fbFns.doc(window.firebaseDb, `users/${user.uid}/boxes`, boxId), {
-                    items: updatedItems
-                });
+                const items = [...box.items];
+                items[idx].quantity = Math.max(0, (items[idx].quantity || 0) + delta);
+                await window.fbFns.updateDoc(window.fbFns.doc(window.firebaseDb, `users/${user.uid}/boxes`, boxId), { items });
             };
 
-            const handleCreateLoan = async (e) => {
+            const addLoan = async (e) => {
                 e.preventDefault();
-                if (!newItemName.trim() || !newBorrower.trim()) {
-                    alert('Udfyld venligst både genstand og hvem der låner den.');
-                    return;
-                }
+                if (!newItemName || !newBorrower) return;
                 await window.fbFns.addDoc(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/loans`), {
-                    item: newItemName.trim(),
-                    borrower: newBorrower.trim(),
-                    date: new Date().toISOString().slice(0, 10)
+                    item: newItemName, borrower: newBorrower, date: new Date().toISOString().slice(0, 10)
                 });
                 setNewItemName('');
                 setNewBorrower('');
             };
 
-            const deleteLoan = async (id) => {
+            const removeLoan = async (id) => {
                 await window.fbFns.deleteDoc(window.fbFns.doc(window.firebaseDb, `users/${user.uid}/loans`, id));
             };
 
-            const handleAddShoppingItem = async (e) => {
+            const addShop = async (e) => {
                 e.preventDefault();
-                if (!newShopItem.trim()) return;
-                await window.fbFns.addDoc(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/shopping`), {
-                    item: newShopItem.trim()
-                });
+                if (!newShopItem) return;
+                await window.fbFns.addDoc(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/shopping`), { item: newShopItem });
                 setNewShopItem('');
             };
+
+            const removeShop = async (id) => {
+                await window.fbFns.deleteDoc(window.fbFns.doc(window.firebaseDb, `users/${user.uid}/shopping`, id));
+            };
+
+            const handleAiScan = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCapturedImg(reader.result);
+                    setIsAnalyzing(true);
+                    setTimeout(() => {
+                        setIsAnalyzing(false);
+                        setAiResult({
+                            title: 'Ny Kasse - Skan Resultat',
+                            location: 'Værksted - Hovedreol',
+                            items: [
+                                { name: 'Kabelsko Assorteret', quantity: 25, category: 'El', hint: 'I sorteringsæske' },
+                                { name: 'Krympeslange', quantity: 10, category: 'El', hint: 'Ligger i rulle' }
+                            ]
+                        });
+                    }, 2000);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const saveAiBox = async () => {
+                if (!aiResult) return;
+                await window.fbFns.addDoc(window.fbFns.collection(window.firebaseDb, `users/${user.uid}/boxes`), {
+                    title: aiResult.title,
+                    location: aiResult.location,
+                    image: capturedImg || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                    items: aiResult.items
+                });
+                alert('Kasse gemt!');
+                setAiResult(null);
+                setCapturedImg(null);
+                setActiveTab('search');
+            };
+
+            const filteredBoxes = boxes.filter(b => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return b.title.toLowerCase().includes(q) || (b.items && b.items.some(i => i.name.toLowerCase().includes(q)));
+            });
+
+            if (!isReady) {
+                return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center font-bold">Indlæser sky-forbindelse...</div>;
+            }
+
+            if (!user) {
+                return (
+                    <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center p-6 shadow-2xl">
+                        <div className="text-center space-y-3 mb-6">
+                            <div className="w-16 h-16 bg-amber-500 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">🔍</div>
+                            <h1 className="text-2xl font-black">FindIt</h1>
+                            <p className="text-sm text-slate-400">Log ind for at få adgang til dit værksted</p>
+                        </div>
+                        <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 space-y-4 shadow-xl">
+                            {errorMsg && <p className="text-xs text-red-400 text-center">{errorMsg}</p>}
+                            <form onSubmit={handleAuthSubmit} className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-slate-300">E-mail</label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="din@email.dk" className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500 mt-1" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-300">Adgangskode</label>
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500 mt-1" />
+                                </div>
+                                <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3.5 rounded-xl shadow-lg transition">{isLoginView ? 'Log ind' : 'Opret konto'}</button>
+                            </form>
+                            <div className="text-center pt-2">
+                                <button onClick={() => setIsLoginView(!isLoginView)} className="text-xs text-amber-400 hover:underline">
+                                    {isLoginView ? 'Har du ikke en konto? Opret her' : 'Har du allerede en konto? Log ind'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen bg-slate-900 text-slate-100 flex flex-col shadow-2xl pb-24">
+                    <header className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-20">
+                        <div onClick={handleLogo} className="cursor-pointer select-none flex items-center gap-2">
+                            <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900">🔍</div>
+                            <div>
+                                <h1 className="font-bold text-sm leading-tight">FindIt</h1>
+                                <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{user.email}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isPro ? (
+                                <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-500/30">★ PRO</span>
+                            ) : (
+                                <button onClick={() => setShowMobilePay(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium">Abonner</button>
+                            )}
+                            <button onClick={() => window.fbFns.signOut(window.firebaseAuth)} className="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-700 rounded">⎋</button>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 p-4 overflow-y-auto">
+                        {activeTab === 'search' && (
+                            <div className="space-y-4">
+                                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Søg efter ting eller kasser..." className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-amber-500 text-sm" />
+                                <div className="space-y-4">
+                                    {filteredBoxes.map(box => (
+                                        <div key={box.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-lg">
+                                            <div className="relative h-40 bg-slate-700">
+                                                <img src={box.image} alt={box.title} className="w-full h-full object-cover" />
+                                                <div className="absolute top-2 right-2 bg-slate-900/80 px-2 py-1 rounded-lg text-xs font-medium text-amber-400 border border-slate-700">📍 {box.location}</div>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                <h3 className="font-bold text-sm text-slate-100">{box.title}</h3>
+                                                <div className="space-y-2">
+                                                    {box.items && box.items.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-semibold text-amber-300">{item.name}</span>
+                                                                    <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold">{item.quantity} stk.</span>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-400">💡 {item.hint}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                                                                <button onClick={() => updateQty(box.id, idx, -1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-white font-bold">-</button>
+                                                                <span className="w-6 text-center font-bold">{item.quantity}</span>
+                                                                <button onClick={() => updateQty(box.id, idx, 1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded text-white font-bold">+</button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'scan' && (
+                            <div className="space-y-6 text-center py-4">
+                                {!isAnalyzing && !aiResult && (
+                                    <div className="bg-slate-800 border-2 border-dashed border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center space-y-4">
+                                        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400 text-2xl">📸</div>
+                                        <div>
+                                            <h3 className="font-bold text-base text-white">AI Billedscanner & Tæller</h3>
+                                            <p className="text-xs text-slate-400 mt-1">Tag et billede af kassen for automatisk registrering.</p>
+                                        </div>
+                                        <label className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 px-6 rounded-xl text-xs cursor-pointer inline-block">
+                                            <span>Tag billede / Upload kasse</span>
+                                            <input type="file" accept="image/*" capture="environment" onChange={handleAiScan} className="hidden" />
+                                        </label>
+                                    </div>
+                                )}
+                                {isAnalyzing && (
+                                    <div className="bg-slate-800 border border-slate-700 rounded-3xl p-10 space-y-4 text-center">
+                                        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                        <p className="text-xs font-medium text-white">AI analyserer indhold og tæller enheder...</p>
+                                    </div>
+                                )}
+                                {aiResult && (
+                                    <div className="bg-slate-800 border border-amber-500/40 rounded-3xl p-4 space-y-3 text-left shadow-xl">
+                                        <h3 className="font-bold text-xs text-amber-400">✨ AI Analyse Gennemført</h3>
+                                        {capturedImg && <img src={capturedImg} alt="Kasse" className="w-full h-32 object-cover rounded-xl border border-slate-700" />}
+                                        <input type="text" value={aiResult.title} onChange={e => setAiResult({...aiResult, title: e.target.value})} className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-white" />
+                                        <div className="space-y-1.5">
+                                            {aiResult.items.map((it, i) => (
+                                                <div key={i} className="bg-slate-900 p-2 rounded-lg flex justify-between text-xs">
+                                                    <span className="text-amber-300 font-bold">{it.name}</span>
+                                                    <span className="text-amber-400">{it.quantity} stk.</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={() => setAiResult(null)} className="flex-1 bg-slate-700 py-2.5 rounded-xl text-xs font-bold">Annuller</button>
+                                            <button onClick={saveAiBox} className="flex-1 bg-amber-500 text-slate-900 py-2.5 rounded-xl text-xs font-bold">Gem Kasse ✓</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'loans' && (
+                            <div className="space-y-4">
+                                <h2 className="text-base font-bold">Udlån & Indkøb</h2>
+                                <form onSubmit={addLoan} className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-2.5 shadow">
+                                    <h3 className="font-semibold text-xs text-amber-400">➕ Opret nyt udlån</h3>
+                                    <input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Hvad lånes ud?" className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-white" />
+                                    <input type="text" value={newBorrower} onChange={e => setNewBorrower(e.target.value)} placeholder="Hvem låner det?" className="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-white" />
+                                    <button type="submit" className="w-full bg-amber-500 text-slate-900 font-bold py-2 rounded-xl text-xs">Registrer udlån</button>
+                                </form>
+                                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-2.5">
+                                    <h3 className="font-semibold text-xs text-amber-400">Aktive udlån</h3>
+                                    {loans.map(l => (
+                                        <div key={l.id} className="flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-xs">
+                                            <div>
+                                                <span className="font-medium text-amber-300">{l.item}</span>
+                                                <p className="text-[10px] text-slate-400">Lånt af: {l.borrower} ({l.date})</p>
+                                            </div>
+                                            <button onClick={() => removeLoan(l.id)} className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-bold text-[10px]">Afleveret ✓</button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-2.5">
+                                    <h3 className="font-semibold text-xs text-amber-400">Indkøbsliste</h3>
+                                    <form onSubmit={addShop} className="flex gap-2">
+                                        <input type="text" value={newShopItem} onChange={e => setNewShopItem(e.target.value)} placeholder="Tilføj ting..." className="flex-1 bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-white" />
+                                        <button type="submit" className="bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold">Tilføj</button>
+                                    </form>
+                                    {shoppingList.map(s => (
+                                        <div key={s.id} className="flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-xs">
+                                            <span>{s.item}</span>
+                                            <button onClick={() => removeShop(s.id)} className="text-slate-400 hover:text-white text-[10px]">Slet ✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'pro' && (
+                            <div className="space-y-4 py-2">
+                                <div className="bg-gradient-to-br from-amber-500/20 to-slate-800 border border-amber-500/40 rounded-3xl p-5 text-center space-y-3">
+                                    <h2 className="text-lg font-extrabold text-white">FindIt PRO</h2>
+                                    <p className="text-xs text-slate-300">Ubegrænsede kasser og fuld AI-mængdestyring for 29 kr./md.</p>
+                                    <button onClick={() => setShowMobilePay(true)} className="w-full bg-amber-500 text-slate-900 font-bold py-3 rounded-xl text-xs">Abonner PRO</button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-800 border-t border-slate-700 flex justify-around p-3 z-20">
+                        <button onClick={() => setActiveTab('search')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'search' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-base">🔎</span> Søgning
+                        </button>
+                        <button onClick={() => setActiveTab('scan')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'scan' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-base">📸</span> AI Skan
+                        </button>
+                        <button onClick={() => setActiveTab('loans')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'loans' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-base">📋</span> Udlån
+                        </button>
+                        <button onClick={() => setActiveTab('pro')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'pro' ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                            <span className="text-base">★</span> PRO
+                        </button>
+                    </nav>
+
+                    {showMobilePay && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-5 space-y-4 relative">
+                                <button onClick={() => setShowMobilePay(false)} className="absolute top-3 right-3 text-slate-400">✕</button>
+                                <div className="text-center space-y-1">
+                                    <div className="w-10 h-10 bg-red-600 text-white rounded-xl mx-auto flex items-center justify-center font-bold">M</div>
+                                    <h3 className="font-bold text-base">MobilePay Abonnement</h3>
+                                    <p className="text-xs text-slate-400">29 kr./md.</p>
+                                </div>
+                                <button onClick={() => { alert('Godkendt!'); setIsPro(true); setShowMobilePay(false); }} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-xs">Godkend i MobilePay</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showAdmin && (
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-amber-500/50 w-full max-w-md rounded-3xl p-5 space-y-4 relative">
+                                <button onClick={() => { setShowAdmin(false); setIsAdminOk(false); }} className="absolute top-3 right-3 text-slate-400">✕</button>
+                                {!isAdminOk ? (
+                                    <form onSubmit={e => { e.preventDefault(); if (adminCode === '06161821') setIsAdminOk(true); else alert('Forkert kode'); }} className="space-y-3 py-2 text-center">
+                                        <div className="text-2xl">🔐</div>
+                                        <h3 className="font-bold text-sm text-amber-400">Admin-adgang</h3>
+                                        <input type="password" maxLength="8" value={adminCode} onChange={e => setAdminCode(e.target.value)} placeholder="8-cifret kode" className="w-full bg-slate-900 border border-slate-700 px-3 py-2.5 rounded-xl text-center text-base tracking-widest text-white" />
+                                        <button type="submit" className="w-full bg-amber-500 text-slate-900 font-bold py-2.5 rounded-xl text-xs">Log ind</button>
+                                    </form>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <h3 className="font-bold text-sm text-amber-400">📊 Admin Panel</h3>
+                                        <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 space-y-2">
+                                            <h4 className="text-xs font-semibold text-slate-200">Rabatkoder</h4>
+                                            <div className="flex flex-wrap gap-1">
+                                                {customCodes.map((c, i) => (
+                                                    <span key={i} className="bg-slate-800 text-amber-300 text-[10px] px-2 py-1 rounded border border-slate-700">{c}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
